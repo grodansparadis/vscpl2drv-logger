@@ -2,6 +2,8 @@
 # Makefile : Builds vscpl2drv-logger for Unix.
 #
 
+STATIC=@STATIC@
+
 INSTALL = @INSTALL@
 INSTALL_PROGRAM = ${INSTALL}
 INSTALL_DATA = ${INSTALL} -m 644

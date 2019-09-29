@@ -625,6 +625,8 @@ ac_includes_default="\
 
 ac_subst_vars='LTLIBOBJS
 PROJ_SUBDIRS
+STATIC
+EXTRALIBS
 VSCPDIR
 POW_LIB
 LIBOBJS
@@ -4265,6 +4267,51 @@ _ACEOF
 
 fi
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for MD5_Init in -lcrypto" >&5
+$as_echo_n "checking for MD5_Init in -lcrypto... " >&6; }
+if ${ac_cv_lib_crypto_MD5_Init+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lcrypto  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char MD5_Init ();
+int
+main ()
+{
+return MD5_Init ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_crypto_MD5_Init=yes
+else
+  ac_cv_lib_crypto_MD5_Init=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_crypto_MD5_Init" >&5
+$as_echo "$ac_cv_lib_crypto_MD5_Init" >&6; }
+if test "x$ac_cv_lib_crypto_MD5_Init" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBCRYPTO 1
+_ACEOF
+
+  LIBS="-lcrypto $LIBS"
+
+fi
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for sin in -lm" >&5
 $as_echo_n "checking for sin in -lm... " >&6; }
 if ${ac_cv_lib_m_sin+:} false; then :
@@ -4309,6 +4356,142 @@ _ACEOF
   LIBS="-lm $LIBS"
 
 fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for clock_gettime in -lrt" >&5
+$as_echo_n "checking for clock_gettime in -lrt... " >&6; }
+if ${ac_cv_lib_rt_clock_gettime+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lrt  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char clock_gettime ();
+int
+main ()
+{
+return clock_gettime ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_rt_clock_gettime=yes
+else
+  ac_cv_lib_rt_clock_gettime=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_rt_clock_gettime" >&5
+$as_echo "$ac_cv_lib_rt_clock_gettime" >&6; }
+if test "x$ac_cv_lib_rt_clock_gettime" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBRT 1
+_ACEOF
+
+  LIBS="-lrt $LIBS"
+
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for SSL_free in -lssl" >&5
+$as_echo_n "checking for SSL_free in -lssl... " >&6; }
+if ${ac_cv_lib_ssl_SSL_free+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lssl  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char SSL_free ();
+int
+main ()
+{
+return SSL_free ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_ssl_SSL_free=yes
+else
+  ac_cv_lib_ssl_SSL_free=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_ssl_SSL_free" >&5
+$as_echo "$ac_cv_lib_ssl_SSL_free" >&6; }
+if test "x$ac_cv_lib_ssl_SSL_free" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBSSL 1
+_ACEOF
+
+  LIBS="-lssl $LIBS"
+
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for XML_ParserCreate in -lexpat" >&5
+$as_echo_n "checking for XML_ParserCreate in -lexpat... " >&6; }
+if ${ac_cv_lib_expat_XML_ParserCreate+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lexpat  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char XML_ParserCreate ();
+int
+main ()
+{
+return XML_ParserCreate ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_expat_XML_ParserCreate=yes
+else
+  ac_cv_lib_expat_XML_ParserCreate=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_expat_XML_ParserCreate" >&5
+$as_echo "$ac_cv_lib_expat_XML_ParserCreate" >&6; }
+if test "x$ac_cv_lib_expat_XML_ParserCreate" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBEXPAT 1
+_ACEOF
+
+  LIBS="-lexpat $LIBS"
+
+fi
+
 
 
 # Checks for header files.
@@ -6302,6 +6485,27 @@ fi
 
 
 
+EXTRALIBS="${EXTRALIBS} ${LIBS}"
+
+if test "${vscp_static}" = yes ; then
+STATIC="yes"
+else
+STATIC="no"
+fi
+
+
+if sh -c "openssl version | cut -d' ' -f 2 " 2>/dev/null | grep 1.1. >/dev/null; then
+echo "openssl 1.1 libs will be used."
+CFLAGS+=" -DOPENSSL_API_1_1"
+else
+echo "openssl 1.0 libs will be used."
+CFLAGS+=" -DOPENSSL_API_1_0"
+fi
+
+
+
+
+
 if test "${VSCPDIR+set}" = set; then
   echo "variable \$VSCPDIR is set to: $VSCPDIR"
 else
@@ -7603,19 +7807,19 @@ $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
 
 
-echo   "LIBS          : ${LIBS}"
-echo   "EXTRALIBS     : ${EXTRALIBS}"
-echo   "EXTRACPPFLAGS : ${CPPFLAGS}"
-echo   "EXTRACXXFLAGS : ${CXXFLAGS}"
-echo   "EXTRACFLAGS   : ${CFLAGS}"
-echo   "PROJ_SUBDIRS  : ${PROJ_SUBDIRS}"
-
 echo
 echo   "           VSCP configuration"
 echo   "--------------------------------------------"
-echo   "VSCP version          : `sh echo-version` (${PACKAGE_VERSION})"
-echo   "System                : `uname -a` "
-echo   "VSCP install dir      : ${VSCPDIR}"
+echo   "VSCP version     : `sh echo-version` (${PACKAGE_VERSION})"
+echo   "System           : `uname -a` "
+echo   "VSCP install dir : ${VSCPDIR}"
+
+echo   "LIBS             : ${LIBS}"
+echo   "EXTRALIBS        : ${EXTRALIBS}"
+echo   "EXTRACPPFLAGS    : ${CPPFLAGS}"
+echo   "EXTRACXXFLAGS    : ${CXXFLAGS}"
+echo   "EXTRACFLAGS      : ${CFLAGS}"
+echo   "PROJ_SUBDIRS     : ${PROJ_SUBDIRS}"
 
 if test "${ax_enable_debug}" = "yes"
 then
@@ -7623,3 +7827,4 @@ then
 else
    echo "build flavour         : release "
 fi
+

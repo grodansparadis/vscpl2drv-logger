@@ -31,7 +31,12 @@ AC_PROG_RANLIB
 # Check for needed libraries.
 AC_CHECK_LIB([dl], [dlsym])
 AC_CHECK_LIB([pthread], [pthread_create])
+AC_CHECK_LIB([crypto], [MD5_Init])
 AC_CHECK_LIB([m],[sin])
+AC_CHECK_LIB([rt],[clock_gettime])
+AC_CHECK_LIB([ssl], [SSL_free])
+AC_CHECK_LIB([expat], [XML_ParserCreate])
+
 
 # Checks for header files.
 AC_HEADER_DIRENT
@@ -79,6 +84,37 @@ AS_IF([test "$ac_cv_sizeof_long" -eq 8],
     [AC_DEFINE([OSBIT], 32, [Define to the size of a long in bits.])])
 
 AC_SUBST(VSCPDIR)
+AC_SUBST(EXTRALIBS)
+AC_SUBST(STATIC)
+
+EXTRALIBS="${EXTRALIBS} ${LIBS}"
+
+if test "${vscp_static}" = yes ; then
+STATIC="yes"
+else
+STATIC="no"
+fi
+
+dnl
+dnl  openssl version
+dnl
+
+if sh -c "openssl version | cut -d' ' -f 2 " 2>/dev/null | grep 1.1. >/dev/null; then
+echo "openssl 1.1 libs will be used."
+CFLAGS+=" -DOPENSSL_API_1_1"
+else
+echo "openssl 1.0 libs will be used."
+CFLAGS+=" -DOPENSSL_API_1_0"
+fi
+
+dnl
+dnl  Debugging mode
+dnl      Done automatically now
+
+dnl AC_ARG_ENABLE(debug,
+dnl [  --enable-debug/--disable-debug          debug mode (default disabled)],
+dnl [vscp_debug=yes],[vscp_debug=no])
+dnl test "${vscp_debug}" != "yes" && vscp_debug="no"
 
 dnl
 dnl Project base installation folder
@@ -114,28 +150,28 @@ EXTRALIBS="${EXTRALIBS} ${LIBS}"
 dnl Generate makefiles
 AC_OUTPUT
 
-dnl Output some debugging information
-echo   "LIBS          : ${LIBS}"
-echo   "EXTRALIBS     : ${EXTRALIBS}"
-echo   "EXTRACPPFLAGS : ${CPPFLAGS}"
-echo   "EXTRACXXFLAGS : ${CXXFLAGS}"
-echo   "EXTRACFLAGS   : ${CFLAGS}"
-echo   "PROJ_SUBDIRS  : ${PROJ_SUBDIRS}"
-
 dnl Give user some feedback
 echo
 echo   "           VSCP configuration"
 echo   "--------------------------------------------"
-echo   "VSCP version          : `sh echo-version` (${PACKAGE_VERSION})"
-echo   "System                : `uname -a` "
-echo   "VSCP install dir      : ${VSCPDIR}"
+echo   "VSCP version     : `sh echo-version` (${PACKAGE_VERSION})"
+echo   "System           : `uname -a` "
+echo   "VSCP install dir : ${VSCPDIR}"
+
+dnl Output some debugging information
+echo   "LIBS             : ${LIBS}"
+echo   "EXTRALIBS        : ${EXTRALIBS}"
+echo   "EXTRACPPFLAGS    : ${CPPFLAGS}"
+echo   "EXTRACXXFLAGS    : ${CXXFLAGS}"
+echo   "EXTRACFLAGS      : ${CFLAGS}"
+echo   "PROJ_SUBDIRS     : ${PROJ_SUBDIRS}"
 
 dnl echo   "${ax_enable_debug}"
 if test "${ax_enable_debug}" = "yes"
 then
-   echo "build flavour         : debug "
+   echo "build flavour   : debug "
 else
-   echo "build flavour         : release "
+   echo "build flavour   : release "
 fi
 
 dnl vi: set et sts=4 sw=4 com=\:dnl

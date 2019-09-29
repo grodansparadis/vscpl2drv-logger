@@ -4,7 +4,10 @@
 
 # STATIC = yes if a static build is requested.
 STATIC=@STATIC@
-VSCP_PROJ_BASE_DIR=@VSCPDIR@
+VSCP_PROJ_SRC_DIR=${VSCP_PATH}
+VSCP_COMMON_GENERAL=${VSCP_PATH}src/common/
+VSCP_COMMON=${VSCP_PATH}src/vscp/common/
+VSCP_PROJ_BASE_DIR=@VSCPPROJDIR@
 
 prefix = @prefix@
 exec_prefix = @exec_prefix@
@@ -16,14 +19,14 @@ CC = @CC@
 CXX = @CXX@
 
 # get version from the version file
-MAJOR_VERSION = `sed '35!d' ../_vscp_common/version.h  | cut -b 33-`
-MINOR_VERSION = `sed '36!d' ../_vscp_common/version.h  | cut -b 33-`
-RELEASE_VERSION = `sed '37!d' ../_vscp_common/version.h  | cut -b 33-`
-BUILD_VERSION = `sed '38!d' ../_vscp_common/version.h  | cut -b 33-
+MAJOR_VERSION = `sed '35!d' ${VSCP_COMMON}/version.h  | cut -b 33-`
+MINOR_VERSION = `sed '36!d' ${VSCP_COMMON}/version.h  | cut -b 33-`
+RELEASE_VERSION = `sed '37!d' ${VSCP_COMMON}/version.h  | cut -b 33-`
+BUILD_VERSION = `sed '38!d' ${VSCP_COMMON}/version.h  | cut -b 33-
 
-CFLAGS = -std=c99 @CFLAGS@ -fPIC -DCBC -I@top_srcdir@ -I../_vscp_common_general -I../_vscp_common
+CFLAGS = -std=c99 @CFLAGS@ -fPIC -DCBC -I${VSCP_PROJ_SRC_DIR} -I${VSCP_COMMON_GENERAL} -I${VSCP_COMMON}
 CXXFLAGS = -std=c++11 -D__LINUX__ @CFLAGS@ -fPIC -D_REENTRANT @CXXFLAGS@
-CPPFLAGS = -D__LINUX__ -fPIC @CPPFLAGS@ -fno-var-tracking-assignments -I@top_srcdir@ -I../_vscp_common_general -I../_vscp_common
+CPPFLAGS = -D__LINUX__ -fPIC @CPPFLAGS@ -fno-var-tracking-assignments -I${VSCP_PROJ_SRC_DIR} -I${VSCP_COMMON_GENERAL} -I${VSCP_COMMON}
 
 LDFLAGS = @LDFLAGS@
 EXTRALIBS = @EXTRALIBS@
@@ -62,9 +65,7 @@ VSCPL2LOGGER_OBJECTS =  vscpl2drv_logger.o\
 
 ### Targets: ###
 
-all: vscpl2drv-logger.so test
-
-
+all: check-vscp-path vscpl2drv-logger.so test
 
 test:  test.o $(PROJOBJS)
 	$(CXX) -o $@ test.o $(PROJOBJS) $(LDFLAGS) $(EXTRALIBS)
@@ -75,44 +76,44 @@ vscpl2drv-logger.so: $(VSCPL2LOGGER_OBJECTS)
 log.o: ../common/log.cpp ../common/log.h
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ../common/log.cpp -o $@
 
-vscphelperlib.o: ../_vscp_common/vscphelperlib.cpp ../_vscp_common/vscphelperlib.h
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ../_vscp_common/vscphelperlib.cpp -o $@
+vscphelperlib.o: ${VSCP_COMMON}/vscphelperlib.cpp ${VSCP_COMMON}/vscphelperlib.h
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ${VSCP_COMMON}/vscphelperlib.cpp -o $@
 
-vscpremotetcpif.o: ../_vscp_common/vscpremotetcpif.cpp ../_vscp_common/vscpremotetcpif.h
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ../_vscp_common/vscpremotetcpif.cpp -o $@
+vscpremotetcpif.o: ${VSCP_COMMON}/vscpremotetcpif.cpp ${VSCP_COMMON}/vscpremotetcpif.h
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ${VSCP_COMMON}/vscpremotetcpif.cpp -o $@
 
-vscphelper.o: ../_vscp_common/vscphelper.cpp ../_vscp_common/vscphelper.h
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ../_vscp_common/vscphelper.cpp -o $@
+vscphelper.o: ${VSCP_COMMON}/vscphelper.cpp ${VSCP_COMMON}/vscphelper.h
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ${VSCP_COMMON}/vscphelper.cpp -o $@
 
-vscpdatetime.o: ../_vscp_common/vscpdatetime.cpp ../_vscp_common/vscpdatetime.h
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ../_vscp_common/vscpdatetime.cpp -o $@
+vscpdatetime.o: ${VSCP_COMMON}/vscpdatetime.cpp ${VSCP_COMMON}/vscpdatetime.h
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ${VSCP_COMMON}/vscpdatetime.cpp -o $@
 
-sockettcp.o: ../_vscp_common_general/sockettcp.c ../_vscp_common_general/sockettcp.h
-	$(CC) $(CFLAGS) -c ../_vscp_common_general/sockettcp.c -o $@
+sockettcp.o: ${VSCP_COMMON_GENERAL}/sockettcp.c ${VSCP_COMMON_GENERAL}/sockettcp.h
+	$(CC) $(CFLAGS) -c ${VSCP_COMMON_GENERAL}/sockettcp.c -o $@
 
-guid.o: ../_vscp_common/guid.cpp ../_vscp_common/guid.h
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ../_vscp_common/guid.cpp -o $@
+guid.o: ${VSCP_COMMON}/guid.cpp ${VSCP_COMMON}/guid.h
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ${VSCP_COMMON}/guid.cpp -o $@
 
-vscp_aes.o: ../_vscp_common_general/vscp_aes.c ../_vscp_common_general/vscp_aes.h
-	$(CC) $(CFLAGS) -c ../_vscp_common_general/vscp_aes.c -o $@
+vscp_aes.o: ${VSCP_COMMON_GENERAL}/vscp_aes.c ${VSCP_COMMON_GENERAL}/vscp_aes.h
+	$(CC) $(CFLAGS) -c ${VSCP_COMMON_GENERAL}/vscp_aes.c -o $@
 
-crc.o: ../_vscp_common_general/crc.c ../_vscp_common_general/crc.h
-	$(CC) $(CFLAGS) -c ../_vscp_common_general/crc.c -o $@
+crc.o: ${VSCP_COMMON_GENERAL}/crc.c ${VSCP_COMMON_GENERAL}/crc.h
+	$(CC) $(CFLAGS) -c ${VSCP_COMMON_GENERAL}/crc.c -o $@
 
-crc8.o: ../_vscp_common_general/crc8.c ../_vscp_common_general/crc8.h
-	$(CC) $(CFLAGS) -c ../_vscp_common_general/crc8.c -o $@
+crc8.o: ${VSCP_COMMON_GENERAL}/crc8.c ${VSCP_COMMON_GENERAL}/crc8.h
+	$(CC) $(CFLAGS) -c ${VSCP_COMMON_GENERAL}/crc8.c -o $@
 
-vscpbase64.o: ../_vscp_common_general/vscpbase64.c ../_vscp_common_general/vscpbase64.h
-	$(CC) $(CFLAGS) -c ../_vscp_common_general/vscpbase64.c -o $@
+vscpbase64.o: ${VSCP_COMMON_GENERAL}/vscpbase64.c ${VSCP_COMMON_GENERAL}/vscpbase64.h
+	$(CC) $(CFLAGS) -c ${VSCP_COMMON_GENERAL}/vscpbase64.c -o $@
 
-fastpbkdf2.o: ../_vscp_common_general/fastpbkdf2.c ../_vscp_common_general/fastpbkdf2.h
-	$(CC) $(CFLAGS) -c ../_vscp_common_general/fastpbkdf2.c -o $@
+fastpbkdf2.o: ${VSCP_COMMON_GENERAL}/fastpbkdf2.c ${VSCP_COMMON_GENERAL}/fastpbkdf2.h
+	$(CC) $(CFLAGS) -c ${VSCP_COMMON_GENERAL}/fastpbkdf2.c -o $@
 
-vscpmd5.o: ../_vscp_common_general/vscpmd5.c ../_vscp_common_general/vscpmd5.h
-	$(CC) $(CFLAGS) -c ../_vscp_common_general/vscpmd5.c -o $@
+vscpmd5.o: ${VSCP_COMMON_GENERAL}/vscpmd5.c ${VSCP_COMMON_GENERAL}/vscpmd5.h
+	$(CC) $(CFLAGS) -c ${VSCP_COMMON_GENERAL}/vscpmd5.c -o $@
 
-dllist.o: ../_vscp_common_general/dllist.c ../_vscp_common_general/dllist.h
-	$(CC) $(CFLAGS) -c ../_vscp_common_general/dllist.c -o $@
+dllist.o: ${VSCP_COMMON_GENERAL}/dllist.c ${VSCP_COMMON_GENERAL}/dllist.h
+	$(CC) $(CFLAGS) -c ${VSCP_COMMON_GENERAL}/dllist.c -o $@
 
 
 install: all
@@ -143,6 +144,17 @@ clean:
 
 distclean: clean
 	rm -f config.cache config.log config.status bk-deps bk-make-pch shared-ld-sh Makefile
+
+check-vscp-path:
+	@if ! [ -z "$(VSCP_PATH)" ] && [ -d "$(VSCP_PATH)" ]; then\
+		echo "VSCP root folder exists '$(VSCP_PATH)' - GOOD";\
+	else\
+		echo "The environment variable VSCP_PATH does not exists, it must \
+exist and point to the VSCP main project folder. Either specify iy as \
+an argument to make (make VSCP_PATH=....) or export it in .bashrc \
+or equivalent.";\
+		exit 1;\
+	fi
 
 $(ALWAYS_BUILD):  .FORCE
 

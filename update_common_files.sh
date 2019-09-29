@@ -5,38 +5,40 @@
 
 # General common files
 cd _vscp_common_general
-rm -f *
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/common/dllist.c
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/common/dllist.h
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/common/crc.h
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/common/crc.c
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/common/crc8.h
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/common/crc8.c
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/common/sockettcp.h
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/common/sockettcp.c
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/common/vscpmd5.h
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/common/vscpmd5.c
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/common/fastpbkdf2.h
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/common/fastpbkdf2.c
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/common/vscpbase64.h
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/common/vscpbase64.c
-
+cp ${VSCP_PATH}/src/common/dllist.c .
+cp ${VSCP_PATH}/src/common/dllist.h .
+cp ${VSCP_PATH}/src/common/crc.h .
+cp ${VSCP_PATH}/src/common/crc.c .
+cp ${VSCP_PATH}/src/common/crc8.h .
+cp ${VSCP_PATH}/src/common/crc8.c .
+cp ${VSCP_PATH}/src/common/sockettcp.h .
+cp ${VSCP_PATH}/src/common/sockettcp.c .
+cp ${VSCP_PATH}/src/common/vscpmd5.h .
+cp ${VSCP_PATH}/src/common/vscpmd5.c .
+cp ${VSCP_PATH}/src/common/fastpbkdf2.h .
+cp ${VSCP_PATH}/src/common/fastpbkdf2.c .
+cp ${VSCP_PATH}/src/common/vscpbase64.h .
+cp ${VSCP_PATH}/src/common/vscpbase64.c .
+cp ${VSCP_PATH}/src/common/vscp_aes.h .
+cp ${VSCP_PATH}/src/common/vscp_aes.c .
+cp ${VSCP_PATH}/src/common/json.hpp .
+cp -r ${VSCP_PATH}/src/common/nlohmann/ .
 cd ..
 # VSCP Common files
 cd _vscp_common
-rm -f *
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/vscp/common/version.h
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/vscp/common/canal.h
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/vscp/common/canal_macro.h
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/vscp/common/vscp.h
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/vscp/common/vscp_class.h
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/vscp/common/vscp_type.h
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/vscp/common/guid.cpp
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/vscp/common/guid.h
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/vscp/common/vscpremotetcpif.cpp
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/vscp/common/vscpremotetcpif.h
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/vscp/common/vscphelper.cpp
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/vscp/common/vscphelper.h
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/vscp/common/vscpdatetime.cpp
-wget https://raw.githubusercontent.com/grodansparadis/vscp/master/src/vscp/common/vscpdatetime.h
+cp ${VSCP_PATH}/src/vscp/common/version.h .
+cp ${VSCP_PATH}/src/vscp/common/canal.h .
+cp ${VSCP_PATH}/src/vscp/common/canal_macro.h .
+cp ${VSCP_PATH}/src/vscp/common/vscp.h .
+cp ${VSCP_PATH}/src/vscp/common/vscp_class.h .
+cp ${VSCP_PATH}/src/vscp/common/vscp_type.h .
+cp ${VSCP_PATH}/src/vscp/common/guid.cpp .
+cp ${VSCP_PATH}/src/vscp/common/guid.h .
+cp ${VSCP_PATH}/src/vscp/common/vscpremotetcpif.cpp .
+cp ${VSCP_PATH}/src/vscp/common/vscpremotetcpif.h .
+cp ${VSCP_PATH}/src/vscp/common/vscphelper.cpp .
+cp ${VSCP_PATH}/src/vscp/common/vscphelper.h .
+cp ${VSCP_PATH}/src/vscp/common/vscpdatetime.cpp .
+cp ${VSCP_PATH}/src/vscp/common/vscpdatetime.h .
+cp ${VSCP_PATH}/src/vscp/common/mdf.h .
 cd ..
