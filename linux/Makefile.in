@@ -5,8 +5,10 @@
 # STATIC = yes if a static build is requested.
 STATIC=@STATIC@
 VSCP_PROJ_SRC_DIR=${VSCP_PATH}
-VSCP_COMMON_GENERAL=${VSCP_PATH}src/common/
-VSCP_COMMON=${VSCP_PATH}src/vscp/common/
+#VSCP_COMMON_GENERAL=${VSCP_PATH}src/common/
+#VSCP_COMMON=${VSCP_PATH}src/vscp/common/
+VSCP_COMMON_GENERAL=../_vscp_common_general/
+VSCP_COMMON=../_vscp_common/
 VSCP_PROJ_BASE_DIR=@VSCPPROJDIR@
 
 prefix = @prefix@

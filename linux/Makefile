@@ -5,8 +5,8 @@
 # STATIC = yes if a static build is requested.
 STATIC=no
 VSCP_PROJ_SRC_DIR=${VSCP_PATH}
-VSCP_COMMON_GENERAL=${VSCP_PATH}src/common/
-VSCP_COMMON=${VSCP_PATH}src/vscp/common/
+VSCP_COMMON_GENERAL=../_vscp_common_general/
+VSCP_COMMON=../_vscp_common/
 VSCP_PROJ_BASE_DIR=@VSCPPROJDIR@
 
 prefix = /usr/local
@@ -25,11 +25,11 @@ RELEASE_VERSION = `sed '37!d' ${VSCP_COMMON}/version.h  | cut -b 33-`
 BUILD_VERSION = `sed '38!d' ${VSCP_COMMON}/version.h  | cut -b 33-
 
 CFLAGS = -std=c99  -DOPENSSL_API_1_1 -fPIC -DCBC -I${VSCP_PROJ_SRC_DIR} -I${VSCP_COMMON_GENERAL} -I${VSCP_COMMON}
-CXXFLAGS = -std=c++11 -D__LINUX__  -DOPENSSL_API_1_1 -fPIC -D_REENTRANT 
+CXXFLAGS = -std=c++11 -D__LINUX__  -DOPENSSL_API_1_1 -fPIC -D_REENTRANT
 CPPFLAGS = -D__LINUX__ -fPIC  -fno-var-tracking-assignments -I${VSCP_PROJ_SRC_DIR} -I${VSCP_COMMON_GENERAL} -I${VSCP_COMMON}
 
-LDFLAGS = 
-EXTRALIBS =  -lexpat -lssl -lrt -lm -lcrypto -lpthread -ldl  -lexpat -lssl -lrt -lm -lcrypto -lpthread -ldl 
+LDFLAGS =
+EXTRALIBS =  -lexpat -lssl -lrt -lm -lcrypto -lpthread -ldl  -lexpat -lssl -lrt -lm -lcrypto -lpthread -ldl
 
 DLFLAGS = -g -shared -fPIC -Wl,--no-undefined
 STRIP = strip
