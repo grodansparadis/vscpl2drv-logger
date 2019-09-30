@@ -1,4 +1,4 @@
-# vscp_driver_lI_logger
+# vscpl1drv-logger
 
 <img src="https://vscp.org/images/logo.png" width="100">
 
