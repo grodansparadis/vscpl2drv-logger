@@ -1,4 +1,4 @@
-vscpl2drv-logger (14.0.0-1) UNRELEASED; urgency=medium
+vscpl2drv-logger (1.1.0-1) stable; urgency=medium
 
   * Initial release (Closes: #1234)
 

@@ -1,4 +1,4 @@
-// vscp2logger.h : main header file for the canallogger.dll
+// vscpl2drv-logger.h : main header file for the canallogger.dll
 // Linux version
 //
 // This program is free software; you can redistribute it and/or

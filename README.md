@@ -49,7 +49,7 @@ I this case the driver will fetch configuration data from the server from variab
 
 ## Build the driver
 
-To build the driver you follow the same procisuew as with all autoconf based builds
+To build the driver you follow the same procedure as with all autoconf based builds
 
 ```bash
 ./configure
