@@ -63,3 +63,6 @@ config.status
 
 # dist
 dist/*
+
+Makefile
+linux/Makefile

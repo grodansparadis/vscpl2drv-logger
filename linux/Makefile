@@ -118,13 +118,13 @@ dllist.o: ../_vscp_common_general/dllist.c ../_vscp_common_general/dllist.h
 	$(CC) $(CFLAGS) -c ../_vscp_common_general/dllist.c -o $@
 
 
-install:
+install: all
 	$(STRIP) vscpl2drv-logger.so
-	$(INSTALL_DIR) $(VSCP_PROJ_BASE_DIR)/drivers/level2/
-	$(INSTALL_PROGRAM) vscpl2drv-logger.so $(VSCP_PROJ_BASE_DIR)/drivers/level2/
+	$(INSTALL_DIR) $(VSCP_PROJ_BASE_DIR)drivers/level2/
+	$(INSTALL_PROGRAM) vscpl2drv-logger.so $(VSCP_PROJ_BASE_DIR)drivers/level2/
 
-uninstall:
-	rm -rf $(VSCP_PROJ_BASE_DIR)/drivers/level2/vscpl2drv-logger.so
+uninstall: all
+	rm -rf $(VSCP_PROJ_BASE_DIR)drivers/level2/vscpl2drv-logger.so
 
 man: ../man/vscpl2drv-logger.1.md
 	pandoc -s -t man ../man/vscpl2drv-logger.1.md -o ../man/vscpl2drv-logger.1
