@@ -67,10 +67,10 @@ all: vscpl2drv-logger.so test lib
 
 # static lib
 lib:	vscpl2drv-logger.so
-	ar rcs libvscpl2drv-logger.a vscpl2drv-logger.o
+	ar rcs libvscpl2drv-logger.a $(VSCPL2LOGGER_OBJECTS)
 
-test:  test.o $(PROJOBJS)
-	$(CXX) -o $@ test.o $(PROJOBJS) $(LDFLAGS) @LIBS@ $(EXTRALIBS)
+test:  test.o $(VSCPL2LOGGER_OBJECTS)
+	$(CXX) -o $@ test.o $(VSCPL2LOGGER_OBJECTS) $(LDFLAGS) @LIBS@ $(EXTRALIBS)
 
 vscpl2drv-logger.so: $(VSCPL2LOGGER_OBJECTS)
 	$(CXX) -o $@ $(VSCPL2LOGGER_OBJECTS) $(DLFLAGS) @LIBS@ $(EXTRALIBS)
