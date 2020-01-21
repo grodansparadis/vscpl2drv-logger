@@ -1,0 +1,1 @@
+linux/vscpl2drv-logger.so.%MAJOR-VERSION.%MINOR-VERSION.%RELEASE-VERSION /var/lib/vscp/drivers/level2/

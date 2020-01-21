@@ -7,7 +7,7 @@
 //
 // This file is part of the VSCP Project (http://www.vscp.org)
 //
-// Copyright (C) 2000-2019 Ake Hedman,
+// Copyright (C) 2000-2020 Ake Hedman,
 // Grodans Paradis AB, <akhe@grodansparadis.com>
 //
 // This file is distributed in the hope that it will be useful,
@@ -35,11 +35,12 @@
 
 #include <expat.h>
 
+#include <hlo.h>
+#include <remotevariablecodes.h>
 #include <vscp_class.h>
 #include <vscp_type.h>
 #include <vscpdatetime.h>
 #include <vscphelper.h>
-#include <vscpremotetcpif.h>
 
 #include "log.h"
 
@@ -47,8 +48,8 @@
 #define XML_BUFF_SIZE 10000
 
 // Forward declarations
-void *
-threadWorker(void *pData);
+void*
+threadWorker(void* pData);
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -60,13 +61,21 @@ threadWorker(void *pData);
 
 CVSCPLog::CVSCPLog()
 {
-    m_flags = 0;
-    m_bQuit = false;
+    m_bQuit      = false;
+    m_bRead      = false;
+    m_bWrite     = false;
+    m_bQuit      = false;
+    m_bOverWrite = false;
+    m_bWorksFmt  = true;
+    memset(m_Key, 0, 16); // Clear encryption key
+
+    vscp_clearVSCPFilter(&m_vscpfilterTx); // Accept all TX events
 
     sem_init(&m_semSendQueue, 0, 0);
-    pthread_mutex_init(&m_mutexSendQueue, NULL);
+    sem_init(&m_semReceiveQueue, 0, 0);
 
-    openlog("vscpl2drv_logger", LOG_PID, LOG_DAEMON);
+    pthread_mutex_init(&m_mutexSendQueue, NULL);
+    pthread_mutex_init(&m_mutexReceiveQueue, NULL);
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -75,101 +84,126 @@ CVSCPLog::CVSCPLog()
 
 CVSCPLog::~CVSCPLog()
 {
+
     close();
 
-    sem_destroy(&m_semSendQueue);
     pthread_mutex_destroy(&m_mutexSendQueue);
+    pthread_mutex_destroy(&m_mutexReceiveQueue);
 
-    closelog();
+    sem_destroy(&m_semSendQueue);
+    sem_destroy(&m_semReceiveQueue);
 }
+
+// ----------------------------------------------------------------------------
+
+/* clang-format off */
+
+// ----------------------------------------------------------------------------
+
+/*
+    XML Setup
+    ==========
+    <setup debug="true|false"
+            access="rw"
+            path-key="Path to 256-bit crypto key"
+            path="path-to-log-file"
+            brewrite="true|false"
+            bworksfmt="true|false"
+            filter="VSCP filter on string format"
+            mask="VSCP mask on string format" />
+*/
+
+/* clang-format on */
+
+// ----------------------------------------------------------------------------
+
+int depth_setup_parser = 0;
+
+void
+startSetupParser(void* data, const char* name, const char** attr)
+{
+    CVSCPLog* pLog = (CVSCPLog*)data;
+    if (NULL == pLog)
+        return;
+
+    if ((0 == strcmp(name, "setup")) && (0 == depth_setup_parser)) {
+
+        for (int i = 0; attr[i]; i += 2) {
+
+            std::string attribute = attr[i + 1];
+            vscp_trim(attribute);
+
+            if (0 == strcmp(attr[i], "path")) {
+                if (!attribute.empty()) {
+                    pLog->m_pathLogfile = attribute;
+                }
+            } else if (0 == strcmp(attr[i], "filter")) {
+                if (!attribute.empty()) {
+                    if (!vscp_readFilterFromString(&pLog->m_vscpfilterTx,
+                                                   attribute)) {
+                        syslog(LOG_ERR, "Unable to read event receive filter.");
+                    }
+                }
+            } else if (0 == strcmp(attr[i], "mask")) {
+                if (!attribute.empty()) {
+                    if (!vscp_readMaskFromString(&pLog->m_vscpfilterTx,
+                                                 attribute)) {
+                        syslog(LOG_ERR, "Unable to read event receive mask.");
+                    }
+                }
+            } else if (0 == strcmp(attr[i], "brewrite")) {
+                if (!attribute.empty()) {
+                    if (0 == vscp_strcasecmp(attribute.c_str(), "TRUE")) {
+                        pLog->m_bOverWrite = true;
+                    } else {
+                        pLog->m_bOverWrite = false;
+                    }
+                }
+            } else if (0 == strcmp(attr[i], "bworksfmt")) {
+                if (!attribute.empty()) {
+                    if (0 == vscp_strcasecmp(attribute.c_str(), "TRUE")) {
+                        pLog->m_bWorksFmt = true;
+                    } else {
+                        pLog->m_bWorksFmt = false;
+                    }
+                }
+            } else if (0 == strcmp(attr[i], "path-key")) {
+                if (!attribute.empty()) {
+                    pLog->m_pathKey = attribute;
+                }
+            }
+        }
+    }
+
+    depth_setup_parser++;
+}
+
+void
+endSetupParser(void* data, const char* name)
+{
+    depth_setup_parser--;
+}
+
+// ----------------------------------------------------------------------------
 
 //////////////////////////////////////////////////////////////////////
 // open
 //
-// filename
-//      the name of the log file
-//
-// flags
-//      bit 1 = 0 Append.
-//      bit 1 = 1 Rewrite (=overwrite)
-//      bit 2 - 0 Standard format.
-//      bit 2 - 1 VSCP Works XML format.
-//
 
 bool
-CVSCPLog::open(const char *pUsername,
-               const char *pPassword,
-               const char *pHost,
-               short port,
-               const char *pPrefix,
-               const char *pConfig)
+CVSCPLog::open(std::string& pathcfg, cguid& guid)
 {
-    std::string str = std::string(pConfig);
+    // Set GUID
+    m_guid = guid;
 
-    m_username = std::string(pUsername);
-    m_password = std::string(pPassword);
-    m_host     = std::string(pHost);
-    m_port     = port;
-    m_prefix   = std::string(pPrefix);
+    // Save config path
+    m_pathConfig = pathcfg;
 
-    // Parse the configuration string. It should
-    // have the following form
-    // path
-    //
-    std::deque<std::string> tokens;
-    vscp_split(tokens, std::string(pConfig), ";");
-
-    // Check for path in configuration string
-    if (tokens.empty()) {
-        syslog(LOG_ERR, "A path must be configured.");
-    }
-
-    // Path
-    m_path = tokens.front();
-    tokens.pop_front();
-
-    // Check for rewrite in configuration string
-    // valid is "true|false"
-    if (!tokens.empty()) {
-        std::string str;
-        str = tokens.front();
-        tokens.pop_front();
-        vscp_trim(str);
-        if (0 == vscp_strcasecmp(str.c_str(), "TRUE")) {
-            m_flags |= LOG_FILE_OVERWRITE;
-        } else {
-            m_flags &= ~LOG_FILE_OVERWRITE;
-        }
-    }
-
-    // Check for vscpworksfmt in configuration string
-    // valid is "true|false"
-    if (!tokens.empty()) {
-        std::string str;
-        str = tokens.front();
-        tokens.pop_front();
-        vscp_trim(str);
-        if (0 == vscp_strcasecmp(str.c_str(), "TRUE")) {
-            m_flags |= LOG_FILE_VSCP_WORKS;
-        } else {
-            m_flags &= ~LOG_FILE_VSCP_WORKS;
-        }
-    }
-
-    // Filter
-    if (!tokens.empty()) {
-        std::string str;
-        str = tokens.front();
-        tokens.pop_front();
-        vscp_readFilterFromString(&m_vscpfilter, str);
-    }
-
-    // Mask
-    if (!tokens.empty()) {
-        std::string str;
-        str = tokens.front();
-        tokens.pop_front();
-        vscp_readMaskFromString(&m_vscpfilter, str);
+    // Read configuration file
+    if (!doLoadConfig()) {
+        syslog(LOG_ERR,
+               "[vscpl2drv-logger] Failed to load configuration file [%s]",
+               m_pathConfig.c_str());
     }
 
     // start the worker thread
@@ -197,7 +231,7 @@ CVSCPLog::open(const char *pUsername,
 void
 CVSCPLog::close(void)
 {
-    if (m_logStream.is_open() && (m_flags & LOG_FILE_VSCP_WORKS)) {
+    if (m_logStream.is_open() && m_bWorksFmt) {
         m_logStream.write("</vscprxdata>\n", strlen("</vscprxdata>\n"));
     }
 
@@ -205,7 +239,8 @@ CVSCPLog::close(void)
     m_logStream.close();
 
     // Do nothing if already terminated
-    if (m_bQuit) return;
+    if (m_bQuit)
+        return;
 
     m_bQuit = true; // terminate the thread
     sleep(1);       // Give the thread some time to terminate
@@ -216,9 +251,8 @@ CVSCPLog::close(void)
 //
 
 bool
-CVSCPLog::doFilter(vscpEvent *pEvent)
+CVSCPLog::doFilter(vscpEvent* pEvent)
 {
-
     return true;
 }
 
@@ -227,16 +261,392 @@ CVSCPLog::doFilter(vscpEvent *pEvent)
 //
 
 void
-CVSCPLog::setFilter(vscpEvent *pFilter)
-{}
+CVSCPLog::setFilter(vscpEvent* pFilter)
+{
+    return;
+}
 
 //////////////////////////////////////////////////////////////////////
 // setMask
 //
 
 void
-CVSCPLog::setMask(vscpEvent *pMask)
-{}
+CVSCPLog::setMask(vscpEvent* pMask)
+{
+    return;
+}
+
+// ----------------------------------------------------------------------------
+
+///////////////////////////////////////////////////////////////////////////////
+// loadConfiguration
+//
+
+bool
+CVSCPLog::doLoadConfig(void)
+{
+    FILE* fp;
+
+    fp = fopen(m_pathConfig.c_str(), "r");
+    if (NULL == fp) {
+        syslog(LOG_ERR,
+               "[vscpl2drv-logger] Failed to open configuration file [%s]",
+               m_pathConfig.c_str());
+        return false;
+    }
+
+    XML_Parser xmlParser = XML_ParserCreate("UTF-8");
+    XML_SetUserData(xmlParser, this);
+    XML_SetElementHandler(xmlParser, startSetupParser, endSetupParser);
+
+    void* buf = XML_GetBuffer(xmlParser, XML_BUFF_SIZE);
+
+    size_t file_size = 0;
+    file_size        = fread(buf, sizeof(char), XML_BUFF_SIZE, fp);
+    fclose(fp);
+
+    if (XML_STATUS_OK !=
+        XML_ParseBuffer(xmlParser, file_size, file_size == 0)) {
+        enum XML_Error errcode = XML_GetErrorCode(xmlParser);
+        syslog(LOG_ERR,
+               "[vscpl2drv-logger] Failed parse XML setup [%s].",
+               XML_ErrorString(errcode));
+        XML_ParserFree(xmlParser);
+        return false;
+    }
+
+    XML_ParserFree(xmlParser);
+
+    return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// saveConfiguration
+//
+
+bool
+CVSCPLog::doSaveConfig(void)
+{
+    return true;
+}
+
+// ----------------------------------------------------------------------------
+
+int depth_hlo_parser = 0;
+
+void
+startHLOParser(void* data, const char* name, const char** attr)
+{
+    CHLO* pObj = (CHLO*)data;
+    if (NULL == pObj)
+        return;
+
+    if ((0 == strcmp(name, "vscp-cmd")) && (0 == depth_setup_parser)) {
+
+        for (int i = 0; attr[i]; i += 2) {
+
+            std::string attribute = attr[i + 1];
+            vscp_trim(attribute);
+
+            if (0 == strcasecmp(attr[i], "op")) {
+                if (!attribute.empty()) {
+                    pObj->m_op = vscp_readStringValue(attribute);
+                    vscp_makeUpper(attribute);
+                    if (attribute == "VSCP-NOOP") {
+                        pObj->m_op = HLO_OP_NOOP;
+                    } else if (attribute == "VSCP-READVAR") {
+                        pObj->m_op = HLO_OP_READ_VAR;
+                    } else if (attribute == "VSCP-WRITEVAR") {
+                        pObj->m_op = HLO_OP_WRITE_VAR;
+                    } else if (attribute == "VSCP-LOAD") {
+                        pObj->m_op = HLO_OP_LOAD;
+                    } else if (attribute == "VSCP-SAVE") {
+                        pObj->m_op = HLO_OP_SAVE;
+                    } else {
+                        pObj->m_op = HLO_OP_UNKNOWN;
+                    }
+                }
+            } else if (0 == strcasecmp(attr[i], "name")) {
+                if (!attribute.empty()) {
+                    vscp_makeUpper(attribute);
+                    pObj->m_name = attribute;
+                }
+            } else if (0 == strcasecmp(attr[i], "type")) {
+                if (!attribute.empty()) {
+                    pObj->m_varType = vscp_readStringValue(attribute);
+                }
+            } else if (0 == strcasecmp(attr[i], "value")) {
+                if (!attribute.empty()) {
+                    if (vscp_base64_std_decode(attribute)) {
+                        pObj->m_value = attribute;
+                    }
+                }
+            } else if (0 == strcasecmp(attr[i], "full")) {
+                if (!attribute.empty()) {
+                    vscp_makeUpper(attribute);
+                    if ("TRUE" == attribute) {
+                        pObj->m_bFull = true;
+                    } else {
+                        pObj->m_bFull = false;
+                    }
+                }
+            }
+        }
+    }
+
+    depth_hlo_parser++;
+}
+
+void
+endHLOParser(void* data, const char* name)
+{
+    depth_hlo_parser--;
+}
+
+// ----------------------------------------------------------------------------
+
+///////////////////////////////////////////////////////////////////////////////
+// parseHLO
+//
+
+bool
+CVSCPLog::parseHLO(uint16_t size, uint8_t* inbuf, CHLO* phlo)
+{
+    // Check pointers
+    if (NULL == inbuf) {
+        syslog(LOG_ERR,
+               "[vscpl2drv-logger] HLO parser: HLO in-buffer pointer is NULL.");
+        return false;
+    }
+
+    if (NULL == phlo) {
+        syslog(LOG_ERR,
+               "[vscpl2drv-logger] HLO parser: HLO obj pointer is NULL.");
+        return false;
+    }
+
+    if (!size) {
+        syslog(LOG_ERR,
+               "[vscpl2drv-logger] HLO parser: HLO buffer size is zero.");
+        return false;
+    }
+
+    XML_Parser xmlParser = XML_ParserCreate("UTF-8");
+    XML_SetUserData(xmlParser, this);
+    XML_SetElementHandler(xmlParser, startHLOParser, endHLOParser);
+
+    void* buf = XML_GetBuffer(xmlParser, XML_BUFF_SIZE);
+
+    // Copy in the HLO object
+    memcpy(buf, inbuf, size);
+
+    if (!XML_ParseBuffer(xmlParser, size, size == 0)) {
+        syslog(LOG_ERR, "[vscpl2drv-logger] Failed parse XML setup.");
+        XML_ParserFree(xmlParser);
+        return false;
+    }
+
+    XML_ParserFree(xmlParser);
+
+    return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// handleHLO
+//
+
+bool
+CVSCPLog::handleHLO(vscpEvent* pEvent)
+{
+    char buf[512]; // Working buffer
+    vscpEventEx ex;
+
+    // Check pointers
+    if (NULL == pEvent) {
+        syslog(LOG_ERR, "[vscpl2drv-logger] HLO handler: NULL event pointer.");
+        return false;
+    }
+
+    CHLO hlo;
+    if (!parseHLO(pEvent->sizeData, pEvent->pdata, &hlo)) {
+        syslog(LOG_ERR, "[vscpl2drv-logger] Failed to parse HLO.");
+        return false;
+    }
+
+    ex.obid      = 0;
+    ex.head      = 0;
+    ex.timestamp = vscp_makeTimeStamp();
+    vscp_setEventExToNow(&ex); // Set time to current time
+    ex.vscp_class = VSCP_CLASS2_HLO;
+    ex.vscp_type  = VSCP2_TYPE_HLO_COMMAND;
+    m_guid.writeGUID(ex.GUID);
+
+    switch (hlo.m_op) {
+
+        case HLO_OP_NOOP:
+            // Send positive response
+            sprintf(buf,
+                    HLO_CMD_REPLY_TEMPLATE,
+                    "noop",
+                    "OK",
+                    "NOOP commaned executed correctly.");
+
+            memset(ex.data, 0, sizeof(ex.data));
+            ex.sizeData = strlen(buf);
+            memcpy(ex.data, buf, ex.sizeData);
+
+            // Put event in receive queue
+            return eventExToReceiveQueue(ex);
+
+        case HLO_OP_READ_VAR:
+            if ("DEBUG" == hlo.m_name) {
+                /*sprintf(buf,
+                        HLO_READ_VAR_REPLY_TEMPLATE,
+                        "sunrise",
+                        "OK",
+                        VSCP_REMOTE_VARIABLE_CODE_DATETIME,
+                        vscp_convertToBase64(getSunriseTime().getISODateTime())
+                          .c_str());*/
+            } else if ("PATH" == hlo.m_name) {
+                /*sprintf(buf,
+                        HLO_READ_VAR_REPLY_TEMPLATE,
+                        "sunrise",
+                        "OK",
+                        VSCP_REMOTE_VARIABLE_CODE_DATETIME,
+                        vscp_convertToBase64(getSunriseTime().getISODateTime())
+                          .c_str());*/
+            } else if ("OVERWRITE" == hlo.m_name) {
+                /*sprintf(buf,
+                        HLO_READ_VAR_REPLY_TEMPLATE,
+                        "sunrise",
+                        "OK",
+                        VSCP_REMOTE_VARIABLE_CODE_DATETIME,
+                        vscp_convertToBase64(getSunriseTime().getISODateTime())
+                          .c_str());*/
+            } else if ("WORKSFMT" == hlo.m_name) {
+                /*sprintf(buf,
+                        HLO_READ_VAR_REPLY_TEMPLATE,
+                        "sunrise",
+                        "OK",
+                        VSCP_REMOTE_VARIABLE_CODE_DATETIME,
+                        vscp_convertToBase64(getSunriseTime().getISODateTime())
+                          .c_str());*/
+            } else {
+                sprintf(buf,
+                        HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+                        hlo.m_name.c_str(),
+                        ERR_VARIABLE_UNKNOWN,
+                        vscp_convertToBase64(std::string("Unknown variable"))
+                          .c_str());
+            }
+            break;
+
+        case HLO_OP_WRITE_VAR:
+            if ("SUNRISE" == hlo.m_name) {
+                // Read Only variable
+                sprintf(buf,
+                        HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+                        "sunrise",
+                        VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
+                        "Variable is read only.");
+            } else {
+                sprintf(buf,
+                        HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+                        hlo.m_name.c_str(),
+                        1,
+                        vscp_convertToBase64(std::string("Unknown variable"))
+                          .c_str());
+            }
+            break;
+
+        case HLO_OP_SAVE:
+            doSaveConfig();
+            break;
+
+        case HLO_OP_LOAD:
+            doLoadConfig();
+            break;
+
+        default:
+            break;
+    };
+
+    return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// readEncryptionKey
+//
+
+bool
+CVSCPLog::readEncryptionKey(void)
+{
+    std::string line;
+    if (m_pathKey.size()) {
+        std::string line;
+        std::ifstream keyfile(m_pathKey);
+        if (keyfile.is_open()) {
+            getline(keyfile, line);
+            vscp_hexStr2ByteArray(m_Key, 16, line.c_str());
+            keyfile.close();
+        }
+    }
+
+    return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// eventExToReceiveQueue
+//
+
+bool
+CVSCPLog::eventExToReceiveQueue(vscpEventEx& ex)
+{
+    vscpEvent* pev = new vscpEvent();
+    if (!vscp_convertEventExToEvent(pev, &ex)) {
+        syslog(LOG_ERR,
+               "[vscpl2drv-logger] Failed to convert event from ex to ev.");
+        vscp_deleteEvent(pev);
+        return false;
+    }
+    if (NULL != pev) {
+        pthread_mutex_lock(&m_mutexReceiveQueue);
+        m_receiveList.push_back(pev);
+        sem_post(&m_semReceiveQueue);
+        pthread_mutex_unlock(&m_mutexReceiveQueue);
+    } else {
+        syslog(LOG_ERR, "[vscpl2drv-logger] Unable to allocate event storage.");
+    }
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////
+// addEvent2SendQueue
+//
+
+bool
+CVSCPLog::addEvent2SendQueue(const vscpEvent* pEvent)
+{
+    pthread_mutex_lock(&m_mutexSendQueue);
+    m_sendList.push_back((vscpEvent*)pEvent);
+    sem_post(&m_semSendQueue);
+    pthread_mutex_unlock(&m_mutexSendQueue);
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////
+// addEvent2ReceiveQueue
+//
+
+bool
+CVSCPLog::addEvent2ReceiveQueue(const vscpEvent* pEvent)
+{
+    pthread_mutex_lock(&m_mutexReceiveQueue);
+    m_receiveList.push_back((vscpEvent*)pEvent);
+    sem_post(&m_semReceiveQueue);
+    pthread_mutex_unlock(&m_mutexReceiveQueue);
+    return true;
+}
 
 //////////////////////////////////////////////////////////////////////
 // openFile
@@ -246,11 +656,11 @@ bool
 CVSCPLog::openFile(void)
 {
     try {
-        if (m_flags & LOG_FILE_OVERWRITE) {
+        if (m_bOverWrite) {
 
-            m_logStream.open(m_path, std::fstream::out);
+            m_logStream.open(m_pathLogfile, std::fstream::out);
 
-            if (m_flags & LOG_FILE_VSCP_WORKS) {
+            if (m_bWorksFmt) {
                 m_logStream
                   << "<?xml version = \"1.0\" encoding = \"UTF-8\" ?>\n";
                 // RX data start
@@ -262,9 +672,9 @@ CVSCPLog::openFile(void)
 
         } else {
 
-            m_logStream.open(m_path, std::fstream::out);
+            m_logStream.open(m_pathLogfile, std::fstream::out);
 
-            if (m_flags & LOG_FILE_VSCP_WORKS) {
+            if (m_bWorksFmt) {
                 m_logStream
                   << "<?xml version = \"1.0\" encoding = \"UTF-8\" ?>\n";
                 // RX data start
@@ -283,28 +693,14 @@ CVSCPLog::openFile(void)
 }
 
 //////////////////////////////////////////////////////////////////////
-// addEvent2Queue
-//
-
-bool
-CVSCPLog::addEvent2SendQueue(const vscpEvent *pEvent)
-{
-    pthread_mutex_lock(&m_mutexSendQueue);
-    m_sendList.push_back((vscpEvent *)pEvent);
-    sem_post(&m_semSendQueue);
-    pthread_mutex_unlock(&m_mutexSendQueue);
-    return true;
-}
-
-//////////////////////////////////////////////////////////////////////
 // writeEvent
 //
 
 bool
-CVSCPLog::writeEvent(vscpEvent *pEvent)
+CVSCPLog::writeEvent(vscpEvent* pEvent)
 {
 
-    if (m_flags & LOG_FILE_VSCP_WORKS) {
+    if (m_bWorksFmt) {
 
         std::string str;
 
@@ -321,7 +717,7 @@ CVSCPLog::writeEvent(vscpEvent *pEvent)
         m_logStream << "</time>\n";
 
         m_logStream << "<dt>";
-        if (!vscp_getDateStringFromEvent(pEvent, str)) {
+        if (!vscp_getDateStringFromEvent(str, pEvent)) {
             str = "Failed to get date/time.";
         }
         m_logStream << str.c_str();
@@ -339,7 +735,7 @@ CVSCPLog::writeEvent(vscpEvent *pEvent)
         m_logStream << "</type>\n";
 
         m_logStream << "<guid>";
-        vscp_writeGuidToString(pEvent, str);
+        vscp_writeGuidToString(str, pEvent);
         m_logStream << str.c_str();
         m_logStream << "</guid>\n";
 
@@ -349,7 +745,7 @@ CVSCPLog::writeEvent(vscpEvent *pEvent)
 
         if (0 != pEvent->sizeData) {
             m_logStream << "<data>";
-            vscp_writeVscpDataToString(pEvent, str);
+            vscp_writeDataToString(str, pEvent);
             m_logStream << str.c_str();
             m_logStream << "</data>\n";
         }
@@ -383,7 +779,7 @@ CVSCPLog::writeEvent(vscpEvent *pEvent)
         str = vscp_str_format("GUID=", pEvent->vscp_type);
         m_logStream << str.c_str();
 
-        vscp_writeGuidToString(pEvent, str);
+        vscp_writeGuidToString(str, pEvent);
         m_logStream << str.c_str();
 
         str = vscp_str_format(" datasize=%d ", pEvent->sizeData);
@@ -392,7 +788,7 @@ CVSCPLog::writeEvent(vscpEvent *pEvent)
         if (0 != pEvent->sizeData) {
             str = vscp_str_format("data=", pEvent->vscp_type);
             m_logStream << str.c_str();
-            vscp_writeVscpDataToString(pEvent, str);
+            vscp_writeDataToString(str, pEvent);
             m_logStream << str.c_str();
         }
 
@@ -418,84 +814,10 @@ CLogWrkThreadObj::~CLogWrkThreadObj() {}
 // 								Worker thread
 ///////////////////////////////////////////////////////////////////////////////
 
-// ----------------------------------------------------------------------------
-
-/*
-    XML format
-    ==========
-    <setup path="path-to-log-file"
-            brewrite="true|false"
-            bworksfmt="true|false"
-            filter="VSCP filter on string format"
-            mask="VSCP mask on string format" />
-*/
-
-// ----------------------------------------------------------------------------
-
-int depth_setup_parser = 0;
-
-void
-startSetupParser(void *data, const char *name, const char **attr)
+void*
+threadWorker(void* pData)
 {
-    CVSCPLog *pLog = (CVSCPLog *)data;
-    if (NULL == pLog) return;
-
-    if ((0 == strcmp(name, "setup")) && (0 == depth_setup_parser)) {
-
-        for (int i = 0; attr[i]; i += 2) {
-
-            std::string attribute = attr[i + 1];
-            vscp_trim(attribute);
-
-            if (0 == strcmp(attr[i], "path")) {
-                if (!attribute.empty()) {
-                    pLog->m_path = attribute;
-                }
-            } else if (0 == strcmp(attr[i], "filter")) {
-                if (!attribute.empty()) {
-                    if (!vscp_readFilterFromString(&pLog->m_vscpfilter,
-                                                   attribute)) {
-                        syslog(LOG_ERR, "Unable to read event receive filter.");
-                    }
-                }
-            } else if (0 == strcmp(attr[i], "mask")) {
-                if (!attribute.empty()) {
-                    if (!vscp_readMaskFromString(&pLog->m_vscpfilter,
-                                                 attribute)) {
-                        syslog(LOG_ERR, "Unable to read event receive mask.");
-                    }
-                }
-            } else if (0 == strcmp(attr[i], "brewrite")) {
-                if (!attribute.empty()) {
-                    if (0 == vscp_strcasecmp(attribute.c_str(), "TRUE")) {
-                        pLog->m_flags |= LOG_FILE_OVERWRITE;
-                    }
-                }
-            } else if (0 == strcmp(attr[i], "bworksfmt")) {
-                if (!attribute.empty()) {
-                    if (0 == vscp_strcasecmp(attribute.c_str(), "TRUE")) {
-                        pLog->m_flags |= LOG_FILE_VSCP_WORKS;
-                    }
-                }
-            }
-        }
-    }
-
-    depth_setup_parser++;
-}
-
-void
-endSetupParser(void *data, const char *name)
-{
-    depth_setup_parser--;
-}
-
-// ----------------------------------------------------------------------------
-
-void *
-threadWorker(void *pData)
-{
-    CLogWrkThreadObj *pObj = (CLogWrkThreadObj *)pData;
+    CLogWrkThreadObj* pObj = (CLogWrkThreadObj*)pData;
     if (NULL == pObj) {
         syslog(LOG_CRIT,
                "No thread object supplied to worker thread. Aborting!");
@@ -509,101 +831,9 @@ threadWorker(void *pData)
         return NULL;
     }
 
-    // First log on to the host and get configuration
-    // variables
-
-    if (VSCP_ERROR_SUCCESS ==
-        pObj->m_srv.doCmdOpen(pObj->m_pLog->m_host,
-                              pObj->m_pLog->m_username,
-                              pObj->m_pLog->m_password) <= 0) {
-        return NULL;
-    }
-
-    // Find the channel id
-    uint32_t ChannelID;
-    pObj->m_srv.doCmdGetChannelID(&ChannelID);
-
-    // It is possible that there is configuration data the server holds
-    // that we need to read in.
-    // We look for
-    //      prefix_filter to find a filter. A string is expected.
-    //      prefix_mask to find a mask. A string is expected.
-    //      prefix_path to overide the file path for the log file. A string is
-    //      expected. prefix_rewrite to override the overwrite flag. A bool is
-    //      expected.
-
-    // Get filter data
-    std::string varFilter;
-    std::string varMask;
-
-    std::string strFilter = pObj->m_pLog->m_prefix + std::string("_filter");
-    std::string strMask   = pObj->m_pLog->m_prefix + std::string("_mask");
-    if ((VSCP_ERROR_SUCCESS ==
-         pObj->m_srv.getRemoteVariableValue(strFilter, varFilter)) &&
-        (VSCP_ERROR_SUCCESS ==
-         pObj->m_srv.getRemoteVariableValue(strMask, varMask))) {
-        pObj->m_srv.doCmdFilter(varFilter, varMask);
-    }
-
-    // get overriden file path
-    std::string strPath = pObj->m_pLog->m_prefix + std::string("_path");
-    std::string varPath;
-    if (VSCP_ERROR_SUCCESS ==
-        pObj->m_srv.getRemoteVariableValue(strPath, varPath)) {
-        pObj->m_pLog->m_path = varPath;
-    }
-
-    std::string strRewrite = pObj->m_pLog->m_prefix + std::string("_rewrite");
-    bool bOverwrite;
-    if (VSCP_ERROR_SUCCESS ==
-        pObj->m_srv.getRemoteVariableBool(strRewrite, &bOverwrite)) {
-        if (bOverwrite) {
-            pObj->m_pLog->m_flags |= LOG_FILE_OVERWRITE;
-        } else {
-            pObj->m_pLog->m_flags &= ~LOG_FILE_OVERWRITE;
-        }
-    }
-
-    bool bVSCPWorksFormat;
-    std::string strVscpWorkdFmt =
-      pObj->m_pLog->m_prefix + std::string("_vscpworksfmt");
-    if (VSCP_ERROR_SUCCESS ==
-        pObj->m_srv.getRemoteVariableBool(strVscpWorkdFmt, &bVSCPWorksFormat)) {
-        if (bVSCPWorksFormat) {
-            pObj->m_pLog->m_flags |= LOG_FILE_VSCP_WORKS;
-        } else {
-            pObj->m_pLog->m_flags &= ~LOG_FILE_VSCP_WORKS;
-        }
-    }
-
-    // XML setup
-    std::string str;
-    std::string strSetupXML;
-    std::string strName = pObj->m_pLog->m_prefix + std::string("_setup");
-    if (VSCP_ERROR_SUCCESS ==
-        pObj->m_srv.getRemoteVariableValue(strName, strSetupXML, true)) {
-        XML_Parser xmlParser = XML_ParserCreate("UTF-8");
-        XML_SetUserData(xmlParser, pObj->m_pLog);
-        XML_SetElementHandler(xmlParser, startSetupParser, endSetupParser);
-
-        int bytes_read;
-        void *buff = XML_GetBuffer(xmlParser, XML_BUFF_SIZE);
-
-        strncpy((char *)buff, strSetupXML.c_str(), strSetupXML.length());
-
-        bytes_read = strSetupXML.length();
-        if (!XML_ParseBuffer(xmlParser, bytes_read, bytes_read == 0)) {
-            syslog(LOG_ERR, "Failed parse XML setup.");
-        }
-
-        XML_ParserFree(xmlParser);
-    }
-
-    // Close server connection
-    pObj->m_srv.doCmdClose();
-
     // Open the file
-    if (!pObj->m_pLog->openFile()) return NULL;
+    if (!pObj->m_pLog->openFile())
+        return NULL;
 
     while (!pObj->m_pLog->m_bQuit) {
 
@@ -616,13 +846,14 @@ threadWorker(void *pData)
         if (pObj->m_pLog->m_sendList.size()) {
 
             pthread_mutex_lock(&pObj->m_pLog->m_mutexSendQueue);
-            vscpEvent *pEvent = pObj->m_pLog->m_sendList.front();
+            vscpEvent* pEvent = pObj->m_pLog->m_sendList.front();
             pObj->m_pLog->m_sendList.pop_front();
             pthread_mutex_unlock(&pObj->m_pLog->m_mutexSendQueue);
 
-            if (NULL == pEvent) continue;
+            if (NULL == pEvent)
+                continue;
             pObj->m_pLog->writeEvent(pEvent);
-            vscp_deleteVSCPevent(pEvent);
+            vscp_deleteEvent(pEvent);
             pEvent = NULL;
 
         } // Event received

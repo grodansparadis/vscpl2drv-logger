@@ -9,7 +9,7 @@ AC_INIT( [vscpl2drv-logger], [package_version], [akhe@grodansparadis.com])
 AC_CONFIG_MACRO_DIR(m4)
 
 AC_PREREQ(2.57)
-AC_CONFIG_SRCDIR([common/log.cpp])
+AC_CONFIG_SRCDIR([linux/vscpl2drv-logger.cpp])
 AC_CONFIG_AUX_DIR(autotools)
 AC_CONFIG_HEADERS([config.h])
 
@@ -28,14 +28,12 @@ AC_PROG_MAKE_SET
 AC_PROG_RANLIB
 
 # Check for needed libraries.
-AC_CHECK_LIB([dl], [dlsym])
 AC_CHECK_LIB([pthread], [pthread_create])
 AC_CHECK_LIB([crypto], [MD5_Init])
 AC_CHECK_LIB([m],[sin])
 AC_CHECK_LIB([rt],[clock_gettime])
 AC_CHECK_LIB([ssl], [SSL_free])
 AC_CHECK_LIB([expat], [XML_ParserCreate])
-
 
 # Checks for header files.
 AC_HEADER_DIRENT
@@ -113,6 +111,14 @@ echo "openssl 1.0 libs will be used."
 CFLAGS+=" -DOPENSSL_API_1_0"
 fi
 
+dnl
+dnl  Debugging mode
+dnl      Done automatically now
+
+dnl AC_ARG_ENABLE(debug,
+dnl [  --enable-debug/--disable-debug          debug mode (default disabled)],
+dnl [vscp_debug=yes],[vscp_debug=no])
+dnl test "${vscp_debug}" != "yes" && vscp_debug="no"
 
 dnl
 dnl Project base installation folder
@@ -122,7 +128,7 @@ AC_ARG_VAR(DESTDIR, Set base folder for installation (/srv/vscp) )
 if test "${DESTDIR+set}" = set; then
   echo "variable \$DESTDIR is set to: $DESTDIR"
 else
-  DESTDIR="/srv/vscp/"
+  DESTDIR="/usr/lib/vscp/"
   echo "variable \$DESTDIR is set to: $DESTDIR"
 fi
 
@@ -171,5 +177,7 @@ echo   "EXTRACPPFLAGS    : ${CPPFLAGS}"
 echo   "EXTRACXXFLAGS    : ${CXXFLAGS}"
 echo   "EXTRACFLAGS      : ${CFLAGS}"
 echo   "PROJ_SUBDIRS     : ${PROJ_SUBDIRS}"
+
+
 
 dnl vi: set et sts=4 sw=4 com=\:dnl

@@ -7,7 +7,7 @@
 //
 // This file is part of the VSCP (http://www.vscp.org)
 //
-// Copyright (C) 2000-2019 Ake Hedman,
+// Copyright (C) 2000-2020 Ake Hedman,
 // Grodans Paradis AB, <akhe@grodansparadis.com>
 //
 // This file is distributed in the hope that it will be useful,
@@ -22,23 +22,21 @@
 //
 //
 
-#include <string>
-#include <map>
 #include <fstream>
+#include <map>
+#include <string>
 
-#include "stdio.h"
-#include "stdlib.h"
-#include "unistd.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <syslog.h>
 
-#include <canal_macro.h>
 #include "vscpl2drv-logger.h"
-#include "../common/log.h"
+#include <canal_macro.h>
+#include <log.h>
 
-void
-_init() __attribute__((constructor));
-void
-_fini() __attribute__((destructor));
-
+void _init() __attribute__((constructor));
+void _fini() __attribute__((destructor));
 
 // This map holds driver handles/objects
 static std::map<long, CVSCPLog *> g_ifMap;
@@ -50,281 +48,221 @@ static pthread_mutex_t g_mapMutex;
 // DLL constructor
 //
 
-void
-_init()
-{
-    pthread_mutex_init(&g_mapMutex, NULL);
-}
+void _init() { pthread_mutex_init(&g_mapMutex, NULL); }
 
 ////////////////////////////////////////////////////////////////////////////
 // DLL destructor
 //
 
-void
-_fini()
-{
-    // If empty - nothing to do
-    if (g_ifMap.empty()) return;
+void _fini() {
+  // If empty - nothing to do
+  if (g_ifMap.empty())
+    return;
 
-    // Remove orphan objects
+  // Remove orphan objects
 
-    LOCK_MUTEX(g_mapMutex);
+  LOCK_MUTEX(g_mapMutex);
 
-    for (std::map<long, CVSCPLog *>::iterator it = g_ifMap.begin();
-         it != g_ifMap.end();
-         ++it) {
-        // std::cout << it->first << " => " << it->second << '\n';
+  for (std::map<long, CVSCPLog *>::iterator it = g_ifMap.begin();
+       it != g_ifMap.end(); ++it) {
+    // std::cout << it->first << " => " << it->second << '\n';
 
-        CVSCPLog *pif = it->second;
-        if (NULL != pif) {
-            delete pif;
-            pif = NULL;
-        }
+    CVSCPLog *pif = it->second;
+    if (NULL != pif) {
+      delete pif;
+      pif = NULL;
     }
+  }
 
-    g_ifMap.clear(); // Remove all items
+  g_ifMap.clear(); // Remove all items
 
-    UNLOCK_MUTEX(g_mapMutex);
-    pthread_mutex_destroy(&g_mapMutex);
+  UNLOCK_MUTEX(g_mapMutex);
+  pthread_mutex_destroy(&g_mapMutex);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // addDriverObject
 //
 
-long
-addDriverObject(CVSCPLog *pif)
-{
-    std::map<long, CVSCPLog *>::iterator it;
-    long h = 0;
+long addDriverObject(CVSCPLog *pif) {
+  std::map<long, CVSCPLog *>::iterator it;
+  long h = 0;
 
-    LOCK_MUTEX(g_mapMutex);
+  LOCK_MUTEX(g_mapMutex);
 
-    // Find free handle
-    while (true) {
-        if (g_ifMap.end() == (it = g_ifMap.find(h))) break;
-        h++;
-    };
+  // Find free handle
+  while (true) {
+    if (g_ifMap.end() == (it = g_ifMap.find(h)))
+      break;
+    h++;
+  };
 
-    g_ifMap[h] = pif;
-    h += 1681;
+  g_ifMap[h] = pif;
+  h += 1681;
 
-    UNLOCK_MUTEX(g_mapMutex);
+  UNLOCK_MUTEX(g_mapMutex);
 
-    return h;
+  return h;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // getDriverObject
 //
 
-CVSCPLog *
-getDriverObject(long h)
-{
-    std::map<long, CVSCPLog *>::iterator it;
-    long idx = h - 1681;
+CVSCPLog *getDriverObject(long h) {
+  std::map<long, CVSCPLog *>::iterator it;
+  long idx = h - 1681;
 
-    // Check if valid handle
-    if (idx < 0) return NULL;
-
-    it = g_ifMap.find(idx);
-    if (it != g_ifMap.end()) {
-        return it->second;
-    }
-
+  // Check if valid handle
+  if (idx < 0)
     return NULL;
+
+  it = g_ifMap.find(idx);
+  if (it != g_ifMap.end()) {
+    return it->second;
+  }
+
+  return NULL;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // removeDriverObject
 //
 
-void
-removeDriverObject(long h)
-{
-    std::map<long, CVSCPLog *>::iterator it;
-    long idx = h - 1681;
+void removeDriverObject(long h) {
+  std::map<long, CVSCPLog *>::iterator it;
+  long idx = h - 1681;
 
-    // Check if valid handle
-    if (idx < 0) return;
+  // Check if valid handle
+  if (idx < 0)
+    return;
 
-    LOCK_MUTEX(g_mapMutex);
-    it = g_ifMap.find(idx);
-    if (it != g_ifMap.end()) {
-        CVSCPLog *pObj = it->second;
-        if (NULL != pObj) {
-            delete pObj;
-            pObj = NULL;
-        }
-        g_ifMap.erase(it);
+  LOCK_MUTEX(g_mapMutex);
+  it = g_ifMap.find(idx);
+  if (it != g_ifMap.end()) {
+    CVSCPLog *pObj = it->second;
+    if (NULL != pObj) {
+      delete pObj;
+      pObj = NULL;
     }
-    UNLOCK_MUTEX(g_mapMutex);
+    g_ifMap.erase(it);
+  }
+  UNLOCK_MUTEX(g_mapMutex);
 }
-
-
-
-
-
 
 ///////////////////////////////////////////////////////////////////////////////
 //                         V S C P   D R I V E R -  A P I
 ///////////////////////////////////////////////////////////////////////////////
 
-
-
-
-
-
 ///////////////////////////////////////////////////////////////////////////////
 // VSCPOpen
 //
 
-extern "C" long
-VSCPOpen(const char *pUsername,
-         const char *pPassword,
-         const char *pHost,
-         short port,
-         const char *pPrefix,
-         const char *pParameter,
-         unsigned long flags)
-{
-    long h = 0;
+extern "C" long VSCPOpen(const char *pPathConfig, const char *pguid) {
+  long h = 0;
 
-    CVSCPLog *pdrvObj = new CVSCPLog();
-    if (NULL != pdrvObj) {
+  CVSCPLog *pdrvObj = new CVSCPLog();
+  if (NULL != pdrvObj) {
 
-        if (pdrvObj->open(
-              pUsername, pPassword, pHost, port, pPrefix, pParameter)) {
+    std::string cfg(pPathConfig);
+    cguid guid(pguid);
 
-            if (!(h = addDriverObject(pdrvObj))) {
-                delete pdrvObj;
-            }
+    if (pdrvObj->open(cfg, guid)) {
 
-        } else {
-            delete pdrvObj;
-        }
+      if (!(h = addDriverObject(pdrvObj))) {
+        delete pdrvObj;
+      }
+
+    } else {
+      delete pdrvObj;
     }
+  }
 
-    return h;
+  return h;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 //  VSCPClose
 //
 
-extern "C" int
-VSCPClose(long handle)
-{
-    int rv = 0;
-
-    CVSCPLog *pdrvObj = getDriverObject(handle);
-    if (NULL == pdrvObj) return 0;
-    pdrvObj->close();
-    removeDriverObject(handle);
-    rv = 1;
-    return CANAL_ERROR_SUCCESS;
+extern "C" int VSCPClose(long handle) {
+  CVSCPLog *pdrvObj = getDriverObject(handle);
+  if (NULL == pdrvObj)
+    return 0;
+  pdrvObj->close();
+  removeDriverObject(handle);
+  return CANAL_ERROR_SUCCESS;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-//  VSCPBlockingSend
+//  VSCPWrite
 //
 
-extern "C" int
-VSCPBlockingSend(long handle, const vscpEvent *pEvent, unsigned long timeout)
-{
-    int rv = 0;
+extern "C" int VSCPWrite(long handle, const vscpEvent *pEvent,
+                         unsigned long timeout) {
+  CVSCPLog *pdrvObj = getDriverObject(handle);
+  if (NULL == pdrvObj)
+    return CANAL_ERROR_MEMORY;
+  pdrvObj->addEvent2SendQueue(pEvent);
 
-    CVSCPLog *pdrvObj = getDriverObject(handle);
-    if (NULL == pdrvObj) return CANAL_ERROR_MEMORY;
-    pdrvObj->addEvent2SendQueue(pEvent);
-    return CANAL_ERROR_SUCCESS;
+  return CANAL_ERROR_SUCCESS;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-//  VSCPBlockingReceive
+//  VSCPRead
 //
 
-extern "C" int
-VSCPBlockingReceive(long handle, vscpEvent *pEvent, unsigned long timeout)
-{
-    usleep(timeout*1000);
+extern "C" int VSCPRead(long handle, vscpEvent *pEvent, unsigned long timeout) {
+  // Check pointer
+  if (NULL == pEvent)
+    return CANAL_ERROR_PARAMETER;
 
-    // Nothing to receive
-    pEvent = NULL;
-    return CANAL_ERROR_FIFO_EMPTY;
+  CVSCPLog *pdrvObj = getDriverObject(handle);
+  if (NULL == pdrvObj)
+    return CANAL_ERROR_MEMORY;
+
+  struct timespec ts;
+  ts.tv_sec = 0;
+  ts.tv_nsec = timeout * 1000;
+
+  int rv;
+  if (-1 == (rv = sem_timedwait(&pdrvObj->m_semReceiveQueue, &ts))) {
+    if (ETIMEDOUT == errno) {
+      return CANAL_ERROR_TIMEOUT;
+    } else if (EINTR == errno) {
+      syslog(LOG_ERR, "[vscpl2drv-logger] Interrupted by a signal handler");
+      return CANAL_ERROR_INTERNAL;
+    } else if (EINVAL == errno) {
+      syslog(LOG_ERR, "[vscpl2drv-logger] Invalid semaphore (timout)");
+      return CANAL_ERROR_INTERNAL;
+    } else if (EAGAIN == errno) {
+      syslog(LOG_ERR, "[vscpl2drv-logger] Blocking error");
+      return CANAL_ERROR_INTERNAL;
+    } else {
+      syslog(LOG_ERR, "[vscpl2drv-logger] Unknown error");
+      return CANAL_ERROR_INTERNAL;
+    }
+  }
+
+  pthread_mutex_lock(&pdrvObj->m_mutexReceiveQueue);
+  vscpEvent *pLocalEvent = pdrvObj->m_receiveList.front();
+  pdrvObj->m_receiveList.pop_front();
+  pthread_mutex_unlock(&pdrvObj->m_mutexReceiveQueue);
+  if (NULL == pLocalEvent)
+    return CANAL_ERROR_MEMORY;
+
+  vscp_copyEvent(pEvent, pLocalEvent);
+  vscp_deleteEvent(pLocalEvent);
+
+  return CANAL_ERROR_SUCCESS;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-//  VSCPGetLevel
+// VSCPGetVersion
 //
 
-extern "C" unsigned long
-VSCPGetLevel(void)
-{
-    return CANAL_LEVEL_USES_TCPIP;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// VSCPGetDllVersion
-//
-
-extern "C" unsigned long
-VSCPGetDllVersion(void)
-{
-    return VSCP_DLL_VERSION;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// VSCPGetVendorString
-//
-
-extern "C" const char *
-VSCPGetVendorString(void)
-{
-    return VSCP_DLL_VENDOR;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// VSCPGetDriverInfo
-//
-
-extern "C" const char *
-VSCPGetDriverInfo(void)
-{
-    return VSCP_LOGGER_DRIVERINFO;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-//  VSCPGetVSCPGetWebPageTemplate
-//
-
-extern "C" long
-VSCPGetWebPageTemplate(long handle, const char *url, char *page)
-{
-    page = NULL;
-
-    // Not implemented
-    return -1;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-//  VSCPGetVSCPWebPageInfo
-//
-
-extern "C" int
-VSCPGetWebPageInfo(long handle, const struct vscpextwebpageinfo *info)
-{
-    // Not implemented
-    return -1;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-//  VSCPWebPageupdate
-//
-
-extern "C" int
-VSCPWebPageupdate(long handle, const char *url)
-{
-    // Not implemented
-    return -1;
+extern "C" unsigned long VSCPGetVersion(void) {
+  unsigned long ver = MAJOR_VERSION << 24 | MINOR_VERSION << 16 |
+                      RELEASE_VERSION << 8 | BUILD_VERSION;
+  return ver;
 }

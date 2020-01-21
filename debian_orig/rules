@@ -3,6 +3,10 @@
 %:
 	dh $@ --with autoreconf
 
+override_dh_shlibdeps:
+	dpkg-shlibdeps -Tdebian/vscpl2drv-logger.substvars $$(pwd)/debian/vscpl2drv-logger/var/lib/vscp/drivers/level2/vscpl2drv-logger.so.%MAJOR-VERSION.%MINOR-VERSION.%RELEASE-VERSION
+
+
 override_dh_auto_install:
-	strip linux/vscpl2drv-logger.so
-	install -D -m 0755 linux/vscpl2drv-logger.so $$(pwd)/debian/vscpl2drv-logger/srv/vscp/drivers/level2/vscpl2drv-logger.so
+	strip linux/vscpl2drv-logger.so.%MAJOR-VERSION.%MINOR-VERSION.%RELEASE-VERSION
+

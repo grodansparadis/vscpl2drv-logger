@@ -11,7 +11,6 @@ PACKAGE_VERSION=1.1.0
 
 # STATIC = yes if a static build is requested.
 STATIC=no
-VSCP_PROJ_BASE_DIR=/srv/vscp/
 
 prefix = /usr/local
 exec_prefix = ${prefix}
@@ -22,11 +21,34 @@ top_builddir = ..
 CC = gcc
 CXX = g++
 
-CFLAGS = -std=c99  -DOPENSSL_API_1_1 -fPIC -DCBC -I.. -I../common -I../_vscp_common -I../_vscp_common_general
-CXXFLAGS = -std=c++11 -D__LINUX__  -DOPENSSL_API_1_1 -fPIC -D_REENTRANT 
-CPPFLAGS = -D__LINUX__ -fPIC  -fno-var-tracking-assignments -I.. -I../common -I../_vscp_common -I../_vscp_common_general
+WARNINGS_HARD = -Werror -Wall -Wextra -pedantic -Wcast-align -Wcast-qual \
+  -Wctor-dtor-privacy -Wdisabled-optimization -Wformat=2 -Winit-self \
+  -Wlogical-op -Wmissing-include-dirs -Wnoexcept -Wold-style-cast \
+  -Woverloaded-virtual -Wredundant-decls -Wshadow -Wsign-promo \
+  -Wstrict-null-sentinel -Wstrict-overflow=5 -Wundef -Wno-unused \
+  -Wno-variadic-macros -Wno-parentheses -fdiagnostics-show-option
+WARNINGS_MEDIUM = -Wformat-security -Wformat=2 -Wmissing-include-dirs \
+  -Wno-parentheses -Wformat=2 -Wlogical-op
+WARNINGS = -Wall
 
-LIBS = -lexpat -lssl -lrt -lm -lcrypto -lpthread -ldl 
+VERSION_DEFS = -DMAJOR_VERSION=$(MAJOR_VERSION) -DMINOR_VERSION=$(MINOR_VERSION) \
+	-DRELEASE_VERSION=$(RELEASE_VERSION) -DBUILD_VERSION=$(BUILD_VERSION)
+
+CFLAGS = -std=c99  -DOPENSSL_API_1_1 ${WARNINGS} -fPIC -DCBC -I.. \
+	-I../common \
+	-I../vscp/src/vscp/common \
+	-I../vscp/src/common
+CXXFLAGS = -std=c++11 ${WARNINGS} -D__LINUX__  -DOPENSSL_API_1_1 -fPIC -D_REENTRANT 
+CPPFLAGS = -D__LINUX__ -fPIC ${WARNINGS}  -fno-var-tracking-assignments \
+	-I.. \
+	-I../common \
+	-I../vscp/src/vscp/common \
+	-I../vscp/src/common \
+	-I../vscp/src/common/third_party/nlohmann \
+	$(VERSION_DEFS)
+
+LDFLAGS = 
+LIBS = -lexpat -lssl -lrt -lm -lcrypto -lpthread 
 EXTRALIBS = 
 
 DLFLAGS = -g -shared -fPIC -Wl,--no-undefined
@@ -43,9 +65,10 @@ datadir = ${prefix}/share
 includedir = ${prefix}/include
 DLLPREFIX = lib
 
+LIB_PLUS_VER = "vscpl2drv-logger.so.$(MAJOR_VERSION).$(MINOR_VERSION).$(RELEASE_VERSION)"
+LIB_SONAME = "vscpl2drv-logger.so.$(MAJOR_VERSION)"
 
 ### Variables: ###
-
 
 VSCPL2LOGGER_OBJECTS =  vscpl2drv-logger.o\
 	log.o\
@@ -54,6 +77,7 @@ VSCPL2LOGGER_OBJECTS =  vscpl2drv-logger.o\
 	vscpdatetime.o\
 	sockettcp.o\
 	guid.o\
+	hlo.o\
 	crc.o\
 	crc8.o\
 	vscp_aes.o\
@@ -63,68 +87,74 @@ VSCPL2LOGGER_OBJECTS =  vscpl2drv-logger.o\
 
 ### Targets: ###
 
-all: vscpl2drv-logger.so test lib
+all: $(LIB_PLUS_VER) man test
 
-# static lib
-lib:	vscpl2drv-logger.so
-	ar rcs libvscpl2drv-logger.a vscpl2drv-logger.o
+test:  test.o $(VSCPL2LOGGER_OBJECTS)
+	$(CXX) -o $@ test.o $(VSCPL2LOGGER_OBJECTS) $(LDFLAGS) -lexpat -lssl -lrt -lm -lcrypto -lpthread  $(EXTRALIBS)
 
-test:  test.o $(PROJOBJS)
-	$(CXX) -o $@ test.o $(PROJOBJS) $(LDFLAGS) -lexpat -lssl -lrt -lm -lcrypto -lpthread -ldl  $(EXTRALIBS)
-
-vscpl2drv-logger.so: $(VSCPL2LOGGER_OBJECTS)
-	$(CXX) -o $@ $(VSCPL2LOGGER_OBJECTS) $(DLFLAGS) -lexpat -lssl -lrt -lm -lcrypto -lpthread -ldl  $(EXTRALIBS)
+$(LIB_PLUS_VER): $(VSCPL2LOGGER_OBJECTS)
+	$(CXX) -Wl,-soname,$(LIB_SONAME) -o $@ $(VSCPL2LOGGER_OBJECTS) $(DLFLAGS) -lexpat -lssl -lrt -lm -lcrypto -lpthread  $(EXTRALIBS)
+	ar rcs libvscpl2drv-logger.a $(VSCPL2LOGGER_OBJECTS)
 
 log.o: ../common/log.cpp ../common/log.h
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ../common/log.cpp -o $@
 
-vscphelperlib.o: ../_vscp_common/vscphelperlib.cpp ../_vscp_common/vscphelperlib.h
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ../_vscp_common/vscphelperlib.cpp -o $@
+vscphelperlib.o: ../vscp/src/vscp/common/vscphelperlib.cpp ../vscp/src/vscp/common/vscphelperlib.h
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ../vscp/src/vscp/common/vscphelperlib.cpp -o $@
 
-vscpremotetcpif.o: ../_vscp_common/vscpremotetcpif.cpp ../_vscp_common/vscpremotetcpif.h
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ../_vscp_common/vscpremotetcpif.cpp -o $@
+vscpremotetcpif.o: ../vscp/src/vscp/common/vscpremotetcpif.cpp ../vscp/src/vscp/common/vscpremotetcpif.h
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ../vscp/src/vscp/common/vscpremotetcpif.cpp -o $@
 
-vscphelper.o: ../_vscp_common/vscphelper.cpp ../_vscp_common/vscphelper.h
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ../_vscp_common/vscphelper.cpp -o $@
+vscphelper.o: ../vscp/src/vscp/common/vscphelper.cpp ../vscp/src/vscp/common/vscphelper.h
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ../vscp/src/vscp/common/vscphelper.cpp -o $@
 
-vscpdatetime.o: ../_vscp_common/vscpdatetime.cpp ../_vscp_common/vscpdatetime.h
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ../_vscp_common/vscpdatetime.cpp -o $@
+vscpdatetime.o: ../vscp/src/vscp/common/vscpdatetime.cpp ../vscp/src/vscp/common/vscpdatetime.h
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ../vscp/src/vscp/common/vscpdatetime.cpp -o $@
 
-sockettcp.o: ../_vscp_common_general/sockettcp.c ../_vscp_common_general/sockettcp.h
-	$(CC) $(CFLAGS) -c ../_vscp_common_general/sockettcp.c -o $@
+sockettcp.o: ../vscp/src/common/sockettcp.c ../vscp/src/common/sockettcp.h
+	$(CC) $(CFLAGS) -c ../vscp/src/common/sockettcp.c -o $@
 
-guid.o: ../_vscp_common/guid.cpp ../_vscp_common/guid.h
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ../_vscp_common/guid.cpp -o $@
+guid.o: ../vscp/src/vscp/common/guid.cpp ../vscp/src/vscp/common/guid.h
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ../vscp/src/vscp/common/guid.cpp -o $@
 
-vscp_aes.o: ../_vscp_common_general/vscp_aes.c ../_vscp_common_general/vscp_aes.h
-	$(CC) $(CFLAGS) -c ../_vscp_common_general/vscp_aes.c -o $@
+hlo.o: ../vscp/src/vscp/common/hlo.cpp ../vscp/src/vscp/common/hlo.h
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ../vscp/src/vscp/common/hlo.cpp -o $@
 
-crc.o: ../_vscp_common_general/crc.c ../_vscp_common_general/crc.h
-	$(CC) $(CFLAGS) -c ../_vscp_common_general/crc.c -o $@
+vscp_aes.o: ../vscp/src/common/vscp_aes.c ../vscp/src/common/vscp_aes.h
+	$(CC) $(CFLAGS) -c ../vscp/src/common/vscp_aes.c -o $@
 
-crc8.o: ../_vscp_common_general/crc8.c ../_vscp_common_general/crc8.h
-	$(CC) $(CFLAGS) -c ../_vscp_common_general/crc8.c -o $@
+crc.o: ../vscp/src/common/crc.c ../vscp/src/common/crc.h
+	$(CC) $(CFLAGS) -c ../vscp/src/common/crc.c -o $@
 
-vscpbase64.o: ../_vscp_common_general/vscpbase64.c ../_vscp_common_general/vscpbase64.h
-	$(CC) $(CFLAGS) -c ../_vscp_common_general/vscpbase64.c -o $@
+crc8.o: ../vscp/src/common/crc8.c ../vscp/src/common/crc8.h
+	$(CC) $(CFLAGS) -c ../vscp/src/common/crc8.c -o $@
 
-fastpbkdf2.o: ../_vscp_common_general/fastpbkdf2.c ../_vscp_common_general/fastpbkdf2.h
-	$(CC) $(CFLAGS) -c ../_vscp_common_general/fastpbkdf2.c -o $@
+vscpbase64.o: ../vscp/src/common/vscpbase64.c ../vscp/src/common/vscpbase64.h
+	$(CC) $(CFLAGS) -c ../vscp/src/common/vscpbase64.c -o $@
 
-vscpmd5.o: ../_vscp_common_general/vscpmd5.c ../_vscp_common_general/vscpmd5.h
-	$(CC) $(CFLAGS) -c ../_vscp_common_general/vscpmd5.c -o $@
+fastpbkdf2.o: ../vscp/src/common/fastpbkdf2.c ../vscp/src/common/fastpbkdf2.h
+	$(CC) $(CFLAGS) -c ../vscp/src/common/fastpbkdf2.c -o $@
 
-dllist.o: ../_vscp_common_general/dllist.c ../_vscp_common_general/dllist.h
-	$(CC) $(CFLAGS) -c ../_vscp_common_general/dllist.c -o $@
+vscpmd5.o: ../vscp/src/common/vscpmd5.c ../vscp/src/common/vscpmd5.h
+	$(CC) $(CFLAGS) -c ../vscp/src/common/vscpmd5.c -o $@
+
+dllist.o: ../vscp/src/common/dllist.c ../vscp/src/common/dllist.h
+	$(CC) $(CFLAGS) -c ../vscp/src/common/dllist.c -o $@
 
 
 install: all
-	$(STRIP) vscpl2drv-logger.so
-	$(INSTALL_DIR) $(VSCP_PROJ_BASE_DIR)drivers/level2/
-	$(INSTALL_PROGRAM) vscpl2drv-logger.so $(VSCP_PROJ_BASE_DIR)drivers/level2/
+	$(INSTALL_DIR) $(DESTDIR)/drivers/level2
+	$(STRIP) $(LIB_PLUS_VER)
+	$(INSTALL_PROGRAM) $(LIB_PLUS_VER) $(DESTDIR)/drivers/level2
+	ln -fs $(DESTDIR)/drivers/level2/$(LIB_PLUS_VER) $(DESTDIR)/drivers/level2/vscpl2drv-logger.so
+	ln -fs $(DESTDIR)/drivers/level2/$(LIB_PLUS_VER) $(DESTDIR)/drivers/level2/vscpl2drv-logger.so.$(MAJOR_VERSION)
+	ln -fs $(DESTDIR)/drivers/level2/$(LIB_PLUS_VER) $(DESTDIR)/drivers/level2/vscpl2drv-logger.so.$(MAJOR_VERSION).$(MINOR_VERSION
+	$(INSTALL_PROGRAM) vscpl2drv-logger.a $(DESTDIR)/drivers/level2
 
 uninstall: all
-	rm -rf $(VSCP_PROJ_BASE_DIR)drivers/level2/vscpl2drv-logger.so
+	rm -f /usr/lib/vscp//drivers/level2/vscpl2drv-logger.so*
+	rm -f /usr/lib/vscp//drivers/level2/vscpl2drv-logger.a
+	rm -f /usr/share/man/man1/vscpl2drv-logger.1
 
 man: ../man/vscpl2drv-logger.1.md
 	pandoc -s -t man ../man/vscpl2drv-logger.1.md -o ../man/vscpl2drv-logger.1
@@ -143,6 +173,7 @@ clean:
 	rm -f ../common/*.o
 	rm -f ../common/*.o
 	rm -f vscpl2drv-logger.so
+	rm -f libvscpl2drv-logger.a
 	rm -f test
 	rm -rf ../common/*~
 	rm -rf *~

@@ -7,7 +7,7 @@
 //
 // This file is part of the VSCP (http://www.vscp.org)
 //
-// Copyright (C) 2000-2019 Ake Hedman,
+// Copyright (C) 2000-2020 Ake Hedman,
 // Grodans Paradis AB, <akhe@grodansparadis.com>
 //
 // This file is distributed in the hope that it will be useful,
@@ -36,11 +36,12 @@
 #define VSCP_LOG_LIST_MAX_MSG 2048
 
 // Flags
-#define LOG_FILE_OVERWRITE  1L      // Overwrite
-#define LOG_FILE_VSCP_WORKS 2L      // VSCP Works format
+#define LOG_FILE_OVERWRITE  1L // Overwrite
+#define LOG_FILE_VSCP_WORKS 2L // VSCP Works format
 
 // Forward declarations
 class CLogWrkThreadObj;
+class CHLO;
 
 class CVSCPLog
 {
@@ -52,120 +53,172 @@ class CVSCPLog
     virtual ~CVSCPLog();
 
     /*!
-        Filter message
-
-        @param pEvent Pointer to VSCP event
-        @return True if message is accepted false if rejected
-     */
-    bool doFilter(vscpEvent *pEvent);
+      Filter message
+      @param pEvent Pointer to VSCP event
+      @return True if message is accepted false if rejected
+    */
+    bool doFilter(vscpEvent* pEvent);
 
     /*!
-        Set Filter
-     */
-    void setFilter(vscpEvent *pFilter);
+      Set Filter
+    */
+    void setFilter(vscpEvent* pFilter);
 
     /*!
         Set Mask
-     */
-    void setMask(vscpEvent *pMask);
+    */
+    void setMask(vscpEvent* pMask);
 
     /*!
-        Open/create the logfile
-
-        @param Configuration string
-        @param flags
-                bit 1 = 0 Append, bit
-                        1 = 1 Rewrite
-                bit 2,3 Format: 00 - Standard.
-                                01 - VSCP works receive format.
-        @return True on success.
-     */
-    bool open(const char *pUsername,
-              const char *pPassword,
-              const char *pHost,
-              short port,
-              const char *pPrefix,
-              const char *pConfig);
+      Open/create the logfile
+      @param pathcfg Path to configuration file
+      @param guid Unique GUID for driver.
+      @return True on success.
+    */
+    bool open(std::string& pathcfg, cguid& guid);
 
     /*!
-        Flush and close the log file
+      Flush and close the log file
      */
     void close(void);
 
     /*!
-            Add one event to the output queue
-            \param pEvent Pointer to VSCP event
-    \return True on success.S
+      Add one event to the output queue
+      @param pEvent Pointer to VSCP event
+      @return True on success.S
      */
-    bool addEvent2Queue(const vscpEvent *pEvent);
+    bool addEvent2Queue(const vscpEvent* pEvent);
 
     /*!
-        Write an event out to the file
-        \param pEvent Pointer to VSCP event
-        \return True on success.
+      Write an event out to the file
+      @param pEvent Pointer to VSCP event
+      @return True on success.
      */
-    bool writeEvent(vscpEvent *pEvent);
+    bool writeEvent(vscpEvent* pEvent);
 
     /*!
-        Open the log file
-        \return true on success.
-     */
+      Add event to send queue
+      @param pEvent Pointer to event that should be added
+      @result True on success, false on failure
+    */
+    bool addEvent2SendQueue(const vscpEvent* pEvent);
+
+    /*!
+      Add event to receive queue
+      @param pEvent Pointer to event that should be added
+      @result True on success, false on failure
+    */
+    bool addEvent2ReceiveQueue(const vscpEvent* pEvent);
+
+    /*!
+      Parse HLO
+      @param size Size of HLO object 0-511 bytes
+      @param buf Pointer to buf containing HLO
+      @param phlo Pointer to HLO that will get parsed data
+      @return true on successfull parsing, false otherwise
+    */
+    bool parseHLO(uint16_t size, uint8_t* inbuf, CHLO* phlo);
+
+    /*!
+      Handle HLO commands sent to this driver
+      @param pEvent HLO event
+      @return true on success, false on failure
+    */
+    bool handleHLO(vscpEvent* pEvent);
+
+    /*!
+      Put event on receive queue and signal
+      that a new event is available
+      @param ex Event to send
+      @return true on success, false on failure
+    */
+    bool eventExToReceiveQueue(vscpEventEx& ex);
+
+    /*!
+      Load configuration
+      @return true on success, false on failure
+    */
+    bool doLoadConfig(void);
+
+    /*!
+      Save the configuration file.
+    */
+    bool doSaveConfig(void);
+
+    /*!
+      Open the log file
+      @return true on success.
+    */
     bool openFile(void);
 
     /*!
-            Add event to send queue
-     */
-    bool addEvent2SendQueue(const vscpEvent *pEvent);
+      Read encryption key
+    */
+    bool readEncryptionKey(void);
 
   public:
     /// Run flag
     bool m_bQuit;
 
-    /// Working flags
-    unsigned long m_flags;
+    /// True enables debug output to syslog
+    bool m_bDebug;
 
-    /// Server supplied username
-    std::string m_username;
+    /// True if config can be read onm command
+    bool m_bRead;
 
-    /// Server supplied password
-    std::string m_password;
+    /// True if config can be written on comand
+    bool m_bWrite;
 
-    /// server supplied prefix
-    std::string m_prefix;
+    /// Rewrite the log file when the driver starts if enabled
+    bool m_bOverWrite;
 
-    /// server supplied host
-    std::string m_host;
+    /// Save on VSCP Works format if enabled
+    bool m_bWorksFmt;
 
-    /// Server supplied port
-    short m_port;
+    /// 256-bit cryptographic key for HLO
+    std::string m_pathKey;
+
+    /*!
+      256-bit cryptographic key for HLO
+      Empty for no encryption of HLO events
+    */
+    uint8_t m_Key[16];
+
+    // Config file path
+    std::string m_pathConfig;
+
+    /// Unique GUID for this driver
+    cguid m_guid;
 
     /// Path to logfile
-    std::string m_path;
+    std::string m_pathLogfile;
 
     /// The log stream
     std::fstream m_logStream;
 
     /// Pointer to worker thread
     pthread_t m_pWrkThread;
-    
-    // Worker object
-    CLogWrkThreadObj *m_pWorkObj;
 
+    // Worker object
+    CLogWrkThreadObj* m_pWorkObj;
 
     /// Filter
-    vscpEventFilter m_vscpfilter;
+    vscpEventFilter m_vscpfilterTx;
 
     // Queue
-    std::list<vscpEvent *> m_sendList;
-    std::list<vscpEvent *> m_receiveList;
+    std::list<vscpEvent*> m_sendList;
+    std::list<vscpEvent*> m_receiveList;
 
     /*!
-    Event object to indicate that there is an event in the output queue
- */
+      Event object to indicate that there is an event in the
+      output queue
+    */
     sem_t m_semSendQueue;
+    sem_t m_semReceiveQueue;
 
     // Mutex to protect the output queue
     pthread_mutex_t m_mutexSendQueue;
+    pthread_mutex_t m_mutexReceiveQueue;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -185,7 +238,7 @@ class CLogWrkThreadObj
     VscpRemoteTcpIf m_srv;
 
     /// Log object
-    CVSCPLog *m_pLog;
+    CVSCPLog* m_pLog;
 };
 
 #endif // !defined(VSCPLOG_H__6F5CD90E_ACF7_459A_9ACB_849A57595639__INCLUDED_)

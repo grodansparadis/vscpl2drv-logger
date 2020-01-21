@@ -8,7 +8,7 @@
 //
 // This file is part of the VSCP (http://www.vscp.org)
 //
-// Copyright (C) 2000-2019 Ake Hedman,
+// Copyright (C) 2000-2020 Ake Hedman,
 // Grodans Paradis AB, <akhe@grodansparadis.com>
 //
 // This file is distributed in the hope that it will be useful,
@@ -27,23 +27,22 @@
 
 #include "../common/log.h"
 
-#define VSCP_DLL_SONAME "vscpl2drv_logger.1.2"
+#define VSCP_DLL_SONAME "vscpl2drv_logger.1"
 
 // This is the version info for this DLL - Change to your own value
-#define VSCP_DLL_VERSION 0x000002
+#define VSCP_DLL_VERSION 0x000003
 
 // This is the vendor string - Change to your own value
 #define VSCP_DLL_VENDOR                                                        \
     "Grodans Paradis AB, Sweden, https://www.grodansparadis.com"
 
 // Driver information.
-#define VSCP_LOGGER_DRIVERINFO                                                 \
+#define VSCP_LOGGER_DRIVERINFO                                                   \
     "<?xml version = \"1.0\" encoding = \"UTF-8\" ?>"                          \
-    "<!-- Version 1.2.0    2019-01-02   -->"                                   \
-    "<config level=\"1|2\"blocking\"true|false\" description=\"bla bla bla "   \
+    "<!-- Version 1.0.0    2015-05-14   -->"                                   \
+    "<config level=\"2\"blocking\"true|false\" description=\"bla bla bla "     \
     "bla\">"                                                                   \
-    "   <item pos=\"0\" type=\"string\" description\"Serial number for "       \
-    "Tellstick\"/>"                                                            \
+    "   <item pos=\"0\" type=\"string\" description\"Logger driver\"/>"          \
     "   <item pos=\"1\" type=\"path\" description\"Path to configuration "     \
     "file\"/>"                                                                 \
     "</config>"
