@@ -153,8 +153,9 @@ class CVSCPLog
 
     /*!
       Read encryption key
+      @return key size or zero on failure.
     */
-    bool readEncryptionKey(void);
+    size_t readEncryptionKey(void);
 
   public:
     /// Run flag
