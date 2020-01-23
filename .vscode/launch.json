@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(gdb) vscp w/ driver",
+            "name": "(gdb) vscp w/ logger driver",
             "type": "cppdbg",
             "request": "launch",
             "program": "/home/akhe/development/VSCP/vscp/src/vscp/daemon/linux/vscpd",

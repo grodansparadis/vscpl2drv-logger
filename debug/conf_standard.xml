@@ -1,12 +1,10 @@
 <?xml version = "1.0" encoding = "UTF-8" ?>
-    <!-- Version 0.0.1    2019-11-05   -->
-    <config debug="true"
-            write="true"
-            zone="1"
-            subzone="2"
-            longitude="15.1604167"
-            latitude="61.7441833"
-            enable-sunrise="true"
-            enable-sunrise-twilight="true"
-            enable-sunset="true"
-            enable-sunset-twilight="true" />
+<!-- Version 0.0.1    2020-01-23   -->
+<setup debug="true"
+        access="rw"
+        path-key="/home/akhe/development/VSCP/vscpl2drv-logger/debug/secret.key"
+        path-config="/tmp/vscplogger.log"
+        overwrite="false"
+        worksfmt="true"
+        filter="0,0x0000,0x0000,00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00"
+        mask="0,0x0000,0x0000,00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00" />        

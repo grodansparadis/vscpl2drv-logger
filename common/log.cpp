@@ -23,6 +23,7 @@
 
 #include <deque>
 #include <fstream>
+#include <iostream>
 #include <list>
 #include <string>
 
@@ -51,6 +52,14 @@
 void*
 threadWorker(void* pData);
 
+// ----- Logger driver specific HLO commands -----
+
+// Open log file if closed
+#define LOCAL_HLO_CMD_LOG_OPEN HLO_OP_USER_DEFINED
+
+// Close log file
+#define LOCAL_HLO_CMD_LOG_CLOSE HLO_OP_USER_DEFINED + 1
+
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
@@ -67,7 +76,7 @@ CVSCPLog::CVSCPLog()
     m_bQuit      = false;
     m_bOverWrite = false;
     m_bWorksFmt  = true;
-    memset(m_Key, 0, 16); // Clear encryption key
+    memset(m_key, 0, 16); // Clear encryption key
 
     vscp_clearVSCPFilter(&m_vscpfilterTx); // Accept all TX events
 
@@ -133,7 +142,33 @@ startSetupParser(void* data, const char* name, const char** attr)
             std::string attribute = attr[i + 1];
             vscp_trim(attribute);
 
-            if (0 == strcmp(attr[i], "path")) {
+            if (0 == strcmp(attr[i], "debug")) {
+                if (!attribute.empty()) {
+                    if (0 == vscp_strcasecmp(attribute.c_str(), "TRUE")) {
+                        pLog->m_bDebug = true;
+                    } else {
+                        pLog->m_bDebug = false;
+                    }
+                    if (pLog->m_bDebug) {
+                        syslog(LOG_DEBUG,
+                               "[vscpl2drv-logger] 'bDebug' set to true.");
+                    }
+                }
+            } else if (0 == strcasecmp(attr[i], "access")) {
+                if (!attribute.empty()) {
+                    vscp_makeUpper(attribute);
+                    if (std::string::npos != attribute.find("W")) {
+                        pLog->m_bWrite = true;
+                    } else {
+                        pLog->m_bWrite = false;
+                    }
+                    if (std::string::npos != attribute.find("R")) {
+                        pLog->m_bRead = true;
+                    } else {
+                        pLog->m_bRead = false;
+                    }
+                }
+            } else if (0 == strcmp(attr[i], "path-config")) {
                 if (!attribute.empty()) {
                     pLog->m_pathLogfile = attribute;
                 }
@@ -146,7 +181,9 @@ startSetupParser(void* data, const char* name, const char** attr)
                 if (!attribute.empty()) {
                     if (!vscp_readFilterFromString(&pLog->m_vscpfilterTx,
                                                    attribute)) {
-                        syslog(LOG_ERR, "Unable to read event receive filter.");
+                        syslog(LOG_ERR,
+                               "[vscpl2drv-logger] Unable to read event "
+                               "receive filter.");
                     } else if (pLog->m_bDebug) {
                         std::string str;
                         vscp_writeFilterToString(str, &pLog->m_vscpfilterTx);
@@ -160,7 +197,9 @@ startSetupParser(void* data, const char* name, const char** attr)
                 if (!attribute.empty()) {
                     if (!vscp_readMaskFromString(&pLog->m_vscpfilterTx,
                                                  attribute)) {
-                        syslog(LOG_ERR, "Unable to read event receive mask.");
+                        syslog(LOG_ERR,
+                               "[vscpl2drv-logger] Unable to read event "
+                               "receive mask.");
                     } else if (pLog->m_bDebug) {
                         std::string str;
                         vscp_writeMaskToString(str, &pLog->m_vscpfilterTx);
@@ -169,7 +208,7 @@ startSetupParser(void* data, const char* name, const char** attr)
                                str.c_str());
                     }
                 }
-            } else if (0 == strcmp(attr[i], "boverwrite")) {
+            } else if (0 == strcmp(attr[i], "overwrite")) {
                 if (!attribute.empty()) {
                     if (0 == vscp_strcasecmp(attribute.c_str(), "TRUE")) {
                         pLog->m_bOverWrite = true;
@@ -182,7 +221,7 @@ startSetupParser(void* data, const char* name, const char** attr)
                                pLog->m_bOverWrite ? "true" : "false");
                     }
                 }
-            } else if (0 == strcmp(attr[i], "bworksfmt")) {
+            } else if (0 == strcmp(attr[i], "worksfmt")) {
                 if (!attribute.empty()) {
                     if (0 == vscp_strcasecmp(attribute.c_str(), "TRUE")) {
                         pLog->m_bWorksFmt = true;
@@ -247,6 +286,14 @@ CVSCPLog::open(std::string& pathcfg, cguid& guid)
         syslog(LOG_ERR,
                "[vscpl2drv-logger] Failed to load configuration file [%s]",
                m_pathConfig.c_str());
+    }
+
+    // Not allowed to have append and VSCP Works format
+    if (m_bWorksFmt && !m_bOverWrite) {
+        m_bOverWrite = true;
+        syslog(LOG_ERR,
+               "[vscpl2drv-logger] VSCP Works format require that "
+               "overwrite=\"true\". Now forced to true.");
     }
 
     // start the worker thread
@@ -370,6 +417,41 @@ CVSCPLog::doLoadConfig(void)
 bool
 CVSCPLog::doSaveConfig(void)
 {
+    std::string access;
+    std::string filter;
+    std::string mask;
+
+    if (m_bRead) {
+        access = "r";
+    }
+
+    if (m_bWrite) {
+        access = "w";
+    }
+
+    vscp_writeFilterToString(filter, &m_vscpfilterTx);
+    vscp_writeMaskToString(mask, &m_vscpfilterTx);
+
+    std::string cfg = vscp_str_format(TEMPLATE_LOGGER_CONF_FILE,
+                                      (m_bDebug ? "true" : "false"),
+                                      access.c_str(),
+                                      m_pathKey.c_str(),
+                                      m_pathConfig.c_str(),
+                                      (m_bOverWrite ? "true" : "false"),
+                                      (m_bWorksFmt ? "true" : "false"),
+                                      filter.c_str(),
+                                      mask.c_str());
+
+    try {
+    std::ofstream fs;
+    fs.open (m_pathConfig);
+    fs << cfg;
+    fs.close();
+    } catch (...) {
+        syslog(LOG_ERR, "[vscpl2drv-logger] Failed to save configuration file.");    
+        return false;
+    }
+
     return true;
 }
 
@@ -461,6 +543,15 @@ endHLOParser(void* data, const char* name)
 bool
 CVSCPLog::parseHLO(uint16_t size, uint8_t* inbuf, CHLO* phlo)
 {
+    uint8_t outbuf[VSCP_MAX_DATA];
+
+    // GUID + type = 17 + dummy payload size=1
+    if (size < 18) {
+        syslog(LOG_ERR,
+               "[vscpl2drv-logger] HLO parser: HLO buffer size is wring.");
+        return false;
+    }
+
     // Check pointers
     if (NULL == inbuf) {
         syslog(LOG_ERR,
@@ -474,10 +565,14 @@ CVSCPLog::parseHLO(uint16_t size, uint8_t* inbuf, CHLO* phlo)
         return false;
     }
 
-    if (!size) {
-        syslog(LOG_ERR,
-               "[vscpl2drv-logger] HLO parser: HLO buffer size is zero.");
-        return false;
+    // Decrypt if needed
+    if (vscp_fileExists(m_pathKey)) {
+        vscp_decryptFrame(outbuf,
+                          inbuf + 16,
+                          size - 16,
+                          m_key,
+                          NULL,
+                          VSCP_ENCRYPTION_AES256);
     }
 
     XML_Parser xmlParser = XML_ParserCreate("UTF-8");
@@ -528,7 +623,7 @@ CVSCPLog::handleHLO(vscpEvent* pEvent)
     ex.timestamp = vscp_makeTimeStamp();
     vscp_setEventExToNow(&ex); // Set time to current time
     ex.vscp_class = VSCP_CLASS2_HLO;
-    ex.vscp_type  = VSCP2_TYPE_HLO_COMMAND;
+    ex.vscp_type  = VSCP2_TYPE_HLO_RESPONSE;
     m_guid.writeGUID(ex.GUID);
 
     switch (hlo.m_op) {
@@ -541,241 +636,319 @@ CVSCPLog::handleHLO(vscpEvent* pEvent)
                     "OK",
                     "NOOP commaned executed correctly.");
 
-            memset(ex.data, 0, sizeof(ex.data));
-            ex.sizeData = strlen(buf);
-            memcpy(ex.data, buf, ex.sizeData);
-
-            // Put event in receive queue
-            return eventExToReceiveQueue(ex);
+            break;
 
         case HLO_OP_READ_VAR:
-            if ("DEBUG" == hlo.m_name) {
-                sprintf(
-                  buf,
-                  HLO_READ_VAR_REPLY_TEMPLATE,
-                  "debug",
-                  "OK",
-                  VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
-                  vscp_convertToBase64(m_bDebug ? "true" : "false").c_str());
-            } else if ("OVERWRITE" == hlo.m_name) {
-                sprintf(
-                  buf,
-                  HLO_READ_VAR_REPLY_TEMPLATE,
-                  "overwrite",
-                  "OK",
-                  VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
-                  vscp_convertToBase64(m_bDebug ? "true" : "false").c_str());
-            } else if ("WORKSFMT" == hlo.m_name) {
-                sprintf(
-                  buf,
-                  HLO_READ_VAR_REPLY_TEMPLATE,
-                  "worksfmt",
-                  "OK",
-                  VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
-                  vscp_convertToBase64(m_bDebug ? "true" : "false").c_str());
-            } else if ("PATH-CONFIG" == hlo.m_name) {
-                sprintf(buf,
-                        HLO_READ_VAR_REPLY_TEMPLATE,
-                        "path-config",
-                        "OK",
-                        VSCP_REMOTE_VARIABLE_CODE_STRING,
-                        vscp_convertToBase64(m_pathConfig.c_str()).c_str());
-            } else if ("FILTER" == hlo.m_name) {
-                std::string str, filter;
-                vscp_writeFilterToString(filter, &m_vscpfilterTx);
-                vscp_writeMaskToString(str, &m_vscpfilterTx);
-                filter += str;
-                sprintf(buf,
-                        HLO_READ_VAR_REPLY_TEMPLATE,
-                        "filter",
-                        "OK",
-                        VSCP_REMOTE_VARIABLE_CODE_FILTER,
-                        vscp_convertToBase64(filter.c_str()).c_str());
+            if (m_bRead) {
+                if ("DEBUG" == hlo.m_name) {
+                    sprintf(buf,
+                            HLO_READ_VAR_REPLY_TEMPLATE,
+                            "debug",
+                            "OK",
+                            VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
+                            vscp_convertToBase64(m_bDebug ? "true" : "false")
+                              .c_str());
+                } else if ("OVERWRITE" == hlo.m_name) {
+                    sprintf(buf,
+                            HLO_READ_VAR_REPLY_TEMPLATE,
+                            "overwrite",
+                            "OK",
+                            VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
+                            vscp_convertToBase64(m_bDebug ? "true" : "false")
+                              .c_str());
+                } else if ("WORKSFMT" == hlo.m_name) {
+                    sprintf(buf,
+                            HLO_READ_VAR_REPLY_TEMPLATE,
+                            "worksfmt",
+                            "OK",
+                            VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
+                            vscp_convertToBase64(m_bDebug ? "true" : "false")
+                              .c_str());
+                } else if ("PATH-CONFIG" == hlo.m_name) {
+                    sprintf(buf,
+                            HLO_READ_VAR_REPLY_TEMPLATE,
+                            "path-config",
+                            "OK",
+                            VSCP_REMOTE_VARIABLE_CODE_STRING,
+                            vscp_convertToBase64(m_pathConfig.c_str()).c_str());
+                } else if ("FILTER" == hlo.m_name) {
+                    std::string str, filter;
+                    vscp_writeFilterToString(filter, &m_vscpfilterTx);
+                    vscp_writeMaskToString(str, &m_vscpfilterTx);
+                    filter += str;
+                    sprintf(buf,
+                            HLO_READ_VAR_REPLY_TEMPLATE,
+                            "filter",
+                            "OK",
+                            VSCP_REMOTE_VARIABLE_CODE_FILTER,
+                            vscp_convertToBase64(filter.c_str()).c_str());
+                } else {
+                    sprintf(
+                      buf,
+                      HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+                      hlo.m_name.c_str(),
+                      ERR_VARIABLE_UNKNOWN,
+                      vscp_convertToBase64(std::string("Unknown variable"))
+                        .c_str());
+                }
             } else {
-                sprintf(buf,
-                        HLO_READ_VAR_ERR_REPLY_TEMPLATE,
-                        hlo.m_name.c_str(),
-                        ERR_VARIABLE_UNKNOWN,
-                        vscp_convertToBase64(std::string("Unknown variable"))
-                          .c_str());
+                // Reads not allowed
+                sprintf(
+                      buf,
+                      HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+                      hlo.m_name.c_str(),
+                      ERR_VARIABLE_PERMISSION,
+                      vscp_convertToBase64(std::string("Not allowed to read variable"))
+                        .c_str());
             }
             break;
 
         case HLO_OP_WRITE_VAR:
-            if ("DEBUG" == hlo.m_name) {
-                std::string str = hlo.m_value;
-                vscp_makeUpper(str);
-                if (std::string::npos != str.find("TRUE")) {
-                    m_bDebug = true;
-                    sprintf(buf,
-                            HLO_READ_VAR_REPLY_TEMPLATE,
-                            "debug",
-                            "OK",
-                            VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
-                            vscp_convertToBase64(m_bDebug ? "true" : "false")
-                              .c_str());
-                } else if (std::string::npos != str.find("FALSE")) {
-                    m_bDebug = false;
-                    sprintf(buf,
-                            HLO_READ_VAR_REPLY_TEMPLATE,
-                            "debug",
-                            "OK",
-                            VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
-                            vscp_convertToBase64(m_bDebug ? "true" : "false")
-                              .c_str());
-                } else {
-                    // Invalid value
-                    sprintf(buf,
-                            HLO_READ_VAR_ERR_REPLY_TEMPLATE,
-                            "debug",
-                            ERR_VARIABLE_VALUE,
-                            vscp_convertToBase64("Invalid value").c_str());
-                }
-            } else if ("OVERWRITE" == hlo.m_name) {
-
-                std::string str = hlo.m_value;
-                vscp_makeUpper(str);
-                if (std::string::npos != str.find("TRUE")) {
-                    m_bOverWrite = true;
-                    sprintf(
-                      buf,
-                      HLO_READ_VAR_REPLY_TEMPLATE,
-                      "overwrite",
-                      "OK",
-                      VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
-                      vscp_convertToBase64(m_bOverWrite ? "true" : "false")
-                        .c_str());
-                } else if (std::string::npos != str.find("FALSE")) {
-                    m_bOverWrite = false;
-                    sprintf(
-                      buf,
-                      HLO_READ_VAR_REPLY_TEMPLATE,
-                      "overwrite",
-                      "OK",
-                      VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
-                      vscp_convertToBase64(m_bOverWrite ? "true" : "false")
-                        .c_str());
-                } else {
-                    // Invalid value
-                    sprintf(buf,
-                            HLO_READ_VAR_ERR_REPLY_TEMPLATE,
-                            "overwrite",
-                            ERR_VARIABLE_VALUE,
-                            vscp_convertToBase64("Invalid value").c_str());
-                }
-            } else if ("WORKSFMT" == hlo.m_name) {
-                std::string str = hlo.m_value;
-                vscp_makeUpper(str);
-                if (std::string::npos != str.find("TRUE")) {
-                    m_bWorksFmt = true;
-                    sprintf(buf,
-                            HLO_READ_VAR_REPLY_TEMPLATE,
-                            "worksfmt",
-                            "OK",
-                            VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
-                            vscp_convertToBase64(m_bWorksFmt ? "true" : "false")
-                              .c_str());
-                } else if (std::string::npos != str.find("FALSE")) {
-                    m_bWorksFmt = false;
-                    sprintf(buf,
-                            HLO_READ_VAR_REPLY_TEMPLATE,
-                            "worksfmt",
-                            "OK",
-                            VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
-                            vscp_convertToBase64(m_bWorksFmt ? "true" : "false")
-                              .c_str());
-                } else {
-                    // Invalid value
-                    sprintf(buf,
-                            HLO_READ_VAR_ERR_REPLY_TEMPLATE,
-                            "overwrite",
-                            ERR_VARIABLE_VALUE,
-                            vscp_convertToBase64("Invalid value").c_str());
-                }
-            } else if ("PATH-CONFIG" == hlo.m_name) {
-                if (VSCP_REMOTE_VARIABLE_CODE_STRING == hlo.m_varType) {
-                    if (vscp_fileExists(hlo.m_value)) {
-                        m_pathConfig = hlo.m_value;
+            if (m_bWrite) {
+                if ("DEBUG" == hlo.m_name) {
+                    std::string str = hlo.m_value;
+                    vscp_makeUpper(str);
+                    if (std::string::npos != str.find("TRUE")) {
+                        m_bDebug = true;
                         sprintf(
                           buf,
                           HLO_READ_VAR_REPLY_TEMPLATE,
-                          "path-config",
+                          "debug",
                           "OK",
-                          VSCP_REMOTE_VARIABLE_CODE_STRING,
-                          vscp_convertToBase64(m_pathConfig.c_str()).c_str());
+                          VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
+                          vscp_convertToBase64(m_bDebug ? "true" : "false")
+                            .c_str());
+                    } else if (std::string::npos != str.find("FALSE")) {
+                        m_bDebug = false;
+                        sprintf(
+                          buf,
+                          HLO_READ_VAR_REPLY_TEMPLATE,
+                          "debug",
+                          "OK",
+                          VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
+                          vscp_convertToBase64(m_bDebug ? "true" : "false")
+                            .c_str());
                     } else {
+                        // Invalid value
+                        sprintf(buf,
+                                HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+                                "debug",
+                                ERR_VARIABLE_VALUE,
+                                vscp_convertToBase64("Invalid value").c_str());
+                    }
+                } else if ("OVERWRITE" == hlo.m_name) {
+
+                    std::string str = hlo.m_value;
+                    vscp_makeUpper(str);
+                    if (std::string::npos != str.find("TRUE")) {
+                        m_bOverWrite = true;
+                        sprintf(
+                          buf,
+                          HLO_READ_VAR_REPLY_TEMPLATE,
+                          "overwrite",
+                          "OK",
+                          VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
+                          vscp_convertToBase64(m_bOverWrite ? "true" : "false")
+                            .c_str());
+                    } else if (std::string::npos != str.find("FALSE")) {
+                        m_bOverWrite = false;
+                        sprintf(
+                          buf,
+                          HLO_READ_VAR_REPLY_TEMPLATE,
+                          "overwrite",
+                          "OK",
+                          VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
+                          vscp_convertToBase64(m_bOverWrite ? "true" : "false")
+                            .c_str());
+                    } else {
+                        // Invalid value
+                        sprintf(buf,
+                                HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+                                "overwrite",
+                                ERR_VARIABLE_VALUE,
+                                vscp_convertToBase64("Invalid value").c_str());
+                    }
+                } else if ("WORKSFMT" == hlo.m_name) {
+                    std::string str = hlo.m_value;
+                    vscp_makeUpper(str);
+                    if (std::string::npos != str.find("TRUE")) {
+                        m_bWorksFmt = true;
+                        sprintf(
+                          buf,
+                          HLO_READ_VAR_REPLY_TEMPLATE,
+                          "worksfmt",
+                          "OK",
+                          VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
+                          vscp_convertToBase64(m_bWorksFmt ? "true" : "false")
+                            .c_str());
+                    } else if (std::string::npos != str.find("FALSE")) {
+                        m_bWorksFmt = false;
+                        sprintf(
+                          buf,
+                          HLO_READ_VAR_REPLY_TEMPLATE,
+                          "worksfmt",
+                          "OK",
+                          VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
+                          vscp_convertToBase64(m_bWorksFmt ? "true" : "false")
+                            .c_str());
+                    } else {
+                        // Invalid value
+                        sprintf(buf,
+                                HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+                                "overwrite",
+                                ERR_VARIABLE_VALUE,
+                                vscp_convertToBase64("Invalid value").c_str());
+                    }
+                } else if ("PATH-CONFIG" == hlo.m_name) {
+                    if (VSCP_REMOTE_VARIABLE_CODE_STRING == hlo.m_varType) {
+                        if (vscp_fileExists(hlo.m_value)) {
+                            m_pathConfig = hlo.m_value;
+                            sprintf(buf,
+                                    HLO_READ_VAR_REPLY_TEMPLATE,
+                                    "path-config",
+                                    "OK",
+                                    VSCP_REMOTE_VARIABLE_CODE_STRING,
+                                    vscp_convertToBase64(m_pathConfig.c_str())
+                                      .c_str());
+                        } else {
+                            sprintf(buf,
+                                    HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+                                    "path-config",
+                                    VSCP_ERROR_WRITE_ERROR,
+                                    vscp_convertToBase64(
+                                      "Invalid path (existence/permissions)")
+                                      .c_str());
+                        }
+                    } else {
+                        // Error
                         sprintf(buf,
                                 HLO_READ_VAR_ERR_REPLY_TEMPLATE,
                                 "path-config",
-                                VSCP_ERROR_WRITE_ERROR,
+                                ERR_VARIABLE_WRONG_TYPE,
                                 vscp_convertToBase64(
-                                  "Invalid path (existence/permissions)")
+                                  "Invalid variable type -  Should be string")
                                   .c_str());
                     }
-                } else {
-                    // Error
-                    sprintf(buf,
-                            HLO_READ_VAR_ERR_REPLY_TEMPLATE,
-                            "path-config",
-                            ERR_VARIABLE_WRONG_TYPE,
-                            vscp_convertToBase64(
-                              "Invalid variable type -  Should be string")
-                              .c_str());
-                }
-            } else if ("FILTER" == hlo.m_name) {
-                if (VSCP_REMOTE_VARIABLE_CODE_FILTER == hlo.m_varType) {
-                    if (vscp_readFilterMaskFromString(&m_vscpfilterTx,
-                                                      hlo.m_value)) {
-                        std::string str, filter;
-                        vscp_writeFilterToString(filter, &m_vscpfilterTx);
-                        vscp_writeMaskToString(str, &m_vscpfilterTx);
-                        filter += str;
-                        sprintf(buf,
-                                HLO_READ_VAR_REPLY_TEMPLATE,
-                                "filter",
-                                "OK",
-                                VSCP_REMOTE_VARIABLE_CODE_FILTER,
-                                vscp_convertToBase64(filter.c_str()).c_str());
+                } else if ("FILTER" == hlo.m_name) {
+                    if (VSCP_REMOTE_VARIABLE_CODE_FILTER == hlo.m_varType) {
+                        if (vscp_readFilterMaskFromString(&m_vscpfilterTx,
+                                                          hlo.m_value)) {
+                            std::string str, filter;
+                            vscp_writeFilterToString(filter, &m_vscpfilterTx);
+                            vscp_writeMaskToString(str, &m_vscpfilterTx);
+                            filter += str;
+                            sprintf(
+                              buf,
+                              HLO_READ_VAR_REPLY_TEMPLATE,
+                              "filter",
+                              "OK",
+                              VSCP_REMOTE_VARIABLE_CODE_FILTER,
+                              vscp_convertToBase64(filter.c_str()).c_str());
+                        } else {
+                            sprintf(
+                              buf,
+                              HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+                              "filter",
+                              VSCP_ERROR_WRITE_ERROR,
+                              vscp_convertToBase64("Invalid filter").c_str());
+                        }
                     } else {
+                        // Error
                         sprintf(buf,
                                 HLO_READ_VAR_ERR_REPLY_TEMPLATE,
                                 "filter",
-                                VSCP_ERROR_WRITE_ERROR,
-                                vscp_convertToBase64("Invalid filter").c_str());
+                                ERR_VARIABLE_WRONG_TYPE,
+                                vscp_convertToBase64(
+                                  "Invalid variable type -  Should be filter")
+                                  .c_str());
                     }
                 } else {
-                    // Error
-                    sprintf(buf,
-                            HLO_READ_VAR_ERR_REPLY_TEMPLATE,
-                            "filter",
-                            ERR_VARIABLE_WRONG_TYPE,
-                            vscp_convertToBase64(
-                              "Invalid variable type -  Should be filter")
-                              .c_str());
+                    sprintf(
+                      buf,
+                      HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+                      hlo.m_name.c_str(),
+                      ERR_VARIABLE_UNKNOWN,
+                      vscp_convertToBase64(std::string("Unknown variable"))
+                        .c_str());
                 }
             } else {
-                sprintf(buf,
-                        HLO_READ_VAR_ERR_REPLY_TEMPLATE,
-                        hlo.m_name.c_str(),
-                        ERR_VARIABLE_UNKNOWN,
-                        vscp_convertToBase64(std::string("Unknown variable"))
-                          .c_str());
+                // Writes not allowed
+                sprintf(
+                      buf,
+                      HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+                      hlo.m_name.c_str(),
+                      ERR_VARIABLE_READ_ONLY,
+                      vscp_convertToBase64(std::string("Not allowed to write variable"))
+                        .c_str());
             }
             break;
 
         case HLO_OP_SAVE:
+            if (m_bDebug) {
+                syslog(LOG_ERR,
+                       "[vscpl2drv-logger] HLO_OP_SAVE - Saving "
+                       "configuration.");
+            }
             doSaveConfig();
             break;
 
         case HLO_OP_LOAD:
+            syslog(LOG_ERR,
+                   "[vscpl2drv-logger] HLO_OP_LOAD - Loading "
+                   "configuration.");
             doLoadConfig();
             break;
 
-        default:
-            break;
-    };
+        case LOCAL_HLO_CMD_LOG_OPEN:
+            if (m_bDebug) {
+                syslog(LOG_ERR,
+                       "[vscpl2drv-logger] HLO-CMD OPEN - Opening logfile "
+                       "[%s][%s] .",
+                       m_pathLogfile.c_str(),
+                       (m_logStream.is_open() ? "open" : "closed"));
 
-    return true;
+                if (!m_logStream.is_open()) {
+                    if (!openLogFile()) {
+                        syslog(LOG_ERR,
+                               "[vscpl2drv-logger] HLO-CMD OPEN - Failed to "
+                               "open logfile [%s].",
+                               m_pathLogfile.c_str());
+                    }
+                }
+                break;
+
+                case LOCAL_HLO_CMD_LOG_CLOSE:
+                    if (m_bDebug) {
+                        syslog(LOG_ERR,
+                               "[vscpl2drv-logger] HLO-CMD CLOSE - Closing "
+                               "logfile [%s][%s] .",
+                               m_pathLogfile.c_str(),
+                               (m_logStream.is_open() ? "open" : "closed"));
+                    }
+                    if (m_logStream.is_open()) {
+                        m_logStream.close();
+                    }
+                    break;
+
+                default:
+                    // This command is not understood
+                    sprintf(
+                      buf,
+                      HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+                      hlo.m_name.c_str(),
+                      ERR_VARIABLE_UNKNOWN,
+                      vscp_convertToBase64(std::string("Unknown variable"))
+                        .c_str());
+                    break;
+            };
+    }
+
+    memset(ex.data, 0, sizeof(ex.data));
+    ex.sizeData = strlen(buf);
+    memcpy(ex.data, buf, ex.sizeData);
+
+    // Put event in receive queue
+    return eventExToReceiveQueue(ex);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -793,8 +966,10 @@ CVSCPLog::readEncryptionKey(void)
         if (keyfile.is_open()) {
             getline(keyfile, line);
             vscp_trim(line);
-            keySize = vscp_hexStr2ByteArray(m_Key, 16, line.c_str());
+            keySize = vscp_hexStr2ByteArray(m_key, 32, line.c_str());
             keyfile.close();
+        } else {
+            syslog(LOG_ERR, "[vscpl2drv-logger] Failed to get encryption key.");
         }
     }
 
@@ -859,39 +1034,53 @@ CVSCPLog::addEvent2ReceiveQueue(const vscpEvent* pEvent)
 //
 
 bool
-CVSCPLog::openFile(void)
+CVSCPLog::openLogFile(void)
 {
     try {
         if (m_bOverWrite) {
 
-            m_logStream.open(m_pathLogfile, std::fstream::out);
+            m_logStream.open(m_pathLogfile, std::ios::out | std::ios::trunc);
+            if (!m_logStream.is_open()) {
+                syslog(LOG_ERR,
+                       "[vscpl2drv-logger] Failed to open log file [%s].",
+                       m_pathLogfile.c_str());
+                return false;
+            }
 
+            if (m_bDebug) {
+                syslog(LOG_DEBUG,
+                       "Successfully opened logfile [%s]",
+                       m_pathLogfile.c_str());
+            }
+
+            // Write XML start data
             if (m_bWorksFmt) {
                 m_logStream
                   << "<?xml version = \"1.0\" encoding = \"UTF-8\" ?>\n";
                 // RX data start
                 m_logStream << "<vscprxdata>\n";
-                return true;
-            } else {
+                m_logStream.flush();
                 return true;
             }
 
         } else {
 
-            m_logStream.open(m_pathLogfile, std::fstream::out);
+            m_logStream.open(m_pathLogfile, std::ios::out | std::ios::app);
+            if (!m_logStream.is_open()) {
+                syslog(LOG_ERR,
+                       "[vscpl2drv-logger] Failed to open log file [%s].",
+                       m_pathLogfile.c_str());
+                return false;
+            }
 
-            if (m_bWorksFmt) {
-                m_logStream
-                  << "<?xml version = \"1.0\" encoding = \"UTF-8\" ?>\n";
-                // RX data start
-                m_logStream << "<vscprxdata>\n";
-                return true;
-            } else {
-                return true;
+            if (m_bDebug) {
+                syslog(LOG_DEBUG,
+                       "Successfully opened logfile [%s]",
+                       m_pathLogfile.c_str());
             }
         }
     } catch (...) {
-        syslog(LOG_CRIT, "Failed to open log file!");
+        syslog(LOG_ERR, "[vscpl2drv-logger] Failed to open log file!");
         return false;
     }
 
@@ -899,107 +1088,113 @@ CVSCPLog::openFile(void)
 }
 
 //////////////////////////////////////////////////////////////////////
-// writeEvent
+// writeEvent2Log
 //
 
 bool
-CVSCPLog::writeEvent(vscpEvent* pEvent)
+CVSCPLog::writeEvent2Log(vscpEvent* pEvent)
 {
+    if (m_logStream.is_open()) {
+        if (m_bWorksFmt) {
 
-    if (m_bWorksFmt) {
+            std::string str;
 
-        std::string str;
+            // * * * VSCP Works log format * * *
 
-        // * * * VSCP Works log format * * *
+            // Event
+            m_logStream << "<event>\n";
+            m_logStream << "<dir>\n";
+            m_logStream << "rx";
+            m_logStream << "</dir>\n";
 
-        // Event
-        m_logStream << "<event>\n";
-        m_logStream << "rx";
-        m_logStream << "</dir>\n";
-
-        m_logStream << "<time>";
-        str = vscpdatetime::Now().getISODateTime();
-        m_logStream << str.c_str();
-        m_logStream << "</time>\n";
-
-        m_logStream << "<dt>";
-        if (!vscp_getDateStringFromEvent(str, pEvent)) {
-            str = "Failed to get date/time.";
-        }
-        m_logStream << str.c_str();
-        m_logStream << "</dt>\n";
-
-        m_logStream << "<head>" << pEvent->head;
-        m_logStream << "</head>\n";
-
-        m_logStream << "<class>";
-        m_logStream << pEvent->vscp_class;
-        m_logStream << "</class>\n";
-
-        m_logStream << "<type>";
-        m_logStream << pEvent->vscp_type;
-        m_logStream << "</type>\n";
-
-        m_logStream << "<guid>";
-        vscp_writeGuidToString(str, pEvent);
-        m_logStream << str.c_str();
-        m_logStream << "</guid>\n";
-
-        m_logStream << "<sizedata>"; // Not used by read routine
-        m_logStream << pEvent->sizeData;
-        m_logStream << "</sizedata>\n";
-
-        if (0 != pEvent->sizeData) {
-            m_logStream << "<data>";
-            vscp_writeDataToString(str, pEvent);
+            m_logStream << "<time>";
+            str = vscpdatetime::Now().getISODateTime();
             m_logStream << str.c_str();
-            m_logStream << "</data>\n";
-        }
+            m_logStream << "</time>\n";
 
-        m_logStream << "<timestamp>";
-        m_logStream << pEvent->timestamp;
-        m_logStream << "</timestamp>\n";
-
-        m_logStream << "<note>";
-        m_logStream << "</note>\n";
-
-        m_logStream << "</event>\n";
-
-    } else {
-
-        // * * * Standard log format * * *
-        std::string str;
-
-        str = vscpdatetime::Now().getISODateTime();
-        m_logStream << str.c_str();
-
-        str = vscp_str_format("head=%d ", pEvent->head);
-        m_logStream << str.c_str();
-
-        str = vscp_str_format("class=%d ", pEvent->vscp_class);
-        m_logStream << str.c_str();
-
-        str = vscp_str_format("type=%d ", pEvent->vscp_type);
-        m_logStream << str.c_str();
-
-        str = vscp_str_format("GUID=", pEvent->vscp_type);
-        m_logStream << str.c_str();
-
-        vscp_writeGuidToString(str, pEvent);
-        m_logStream << str.c_str();
-
-        str = vscp_str_format(" datasize=%d ", pEvent->sizeData);
-        m_logStream << str.c_str();
-
-        if (0 != pEvent->sizeData) {
-            str = vscp_str_format("data=", pEvent->vscp_type);
+            m_logStream << "<dt>";
+            if (!vscp_getDateStringFromEvent(str, pEvent)) {
+                str = "Failed to get date/time.";
+            }
             m_logStream << str.c_str();
-            vscp_writeDataToString(str, pEvent);
-            m_logStream << str.c_str();
-        }
+            m_logStream << "</dt>\n";
 
-        str = vscp_str_format(" Timestamp=%d\r\n", pEvent->timestamp);
-        m_logStream << str.c_str();
+            m_logStream << "<head>" << pEvent->head;
+            m_logStream << "</head>\n";
+
+            m_logStream << "<class>";
+            m_logStream << pEvent->vscp_class;
+            m_logStream << "</class>\n";
+
+            m_logStream << "<type>";
+            m_logStream << pEvent->vscp_type;
+            m_logStream << "</type>\n";
+
+            m_logStream << "<guid>";
+            vscp_writeGuidToString(str, pEvent);
+            m_logStream << str.c_str();
+            m_logStream << "</guid>\n";
+
+            m_logStream << "<sizedata>"; // Not used by read routine
+            m_logStream << pEvent->sizeData;
+            m_logStream << "</sizedata>\n";
+
+            if (0 != pEvent->sizeData) {
+                m_logStream << "<data>";
+                vscp_writeDataToString(str, pEvent);
+                m_logStream << str.c_str();
+                m_logStream << "</data>\n";
+            }
+
+            m_logStream << "<timestamp>";
+            m_logStream << pEvent->timestamp;
+            m_logStream << "</timestamp>\n";
+
+            m_logStream << "<note>";
+            m_logStream << "</note>\n";
+
+            m_logStream << "</event>\n";
+
+            m_logStream.flush();
+
+        } else {
+
+            // * * * Standard log format * * *
+            std::string str;
+
+            str = vscpdatetime::Now().getISODateTime();
+            m_logStream << str.c_str();
+
+            str = vscp_str_format("head=%d ", pEvent->head);
+            m_logStream << str.c_str();
+
+            str = vscp_str_format("class=%d ", pEvent->vscp_class);
+            m_logStream << str.c_str();
+
+            str = vscp_str_format("type=%d ", pEvent->vscp_type);
+            m_logStream << str.c_str();
+
+            str = vscp_str_format("GUID=", pEvent->vscp_type);
+            m_logStream << str.c_str();
+
+            vscp_writeGuidToString(str, pEvent);
+            m_logStream << str.c_str();
+
+            str = vscp_str_format(" datasize=%d ", pEvent->sizeData);
+            m_logStream << str.c_str();
+
+            if (0 != pEvent->sizeData) {
+                str = vscp_str_format("data=", pEvent->vscp_type);
+                m_logStream << str.c_str();
+                vscp_writeDataToString(str, pEvent);
+                m_logStream << str.c_str();
+            }
+
+            str = vscp_str_format(" Timestamp=%d\r\n", pEvent->timestamp);
+            m_logStream << str.c_str();
+
+            m_logStream.flush();
+        }
     }
 
     return true;
@@ -1025,21 +1220,25 @@ threadWorker(void* pData)
 {
     CLogWrkThreadObj* pObj = (CLogWrkThreadObj*)pData;
     if (NULL == pObj) {
-        syslog(LOG_CRIT,
-               "No thread object supplied to worker thread. Aborting!");
+        syslog(LOG_ERR,
+               "[vscpl2drv-logger] No thread object supplied to worker thread. "
+               "Aborting!");
         return NULL;
     }
 
     // Check pointers
     if (NULL == pObj->m_pLog) {
-        syslog(LOG_CRIT,
-               "No valid logger object suppied to worker thread. Aborting!");
+        syslog(LOG_ERR,
+               "[vscpl2drv-logger] No valid logger object suppied to worker "
+               "thread. Aborting!");
         return NULL;
     }
 
     // Open the file
-    if (!pObj->m_pLog->openFile())
+    if (!pObj->m_pLog->openLogFile()) {
+        syslog(LOG_ERR, "[vscpl2drv-logger] Failed to open log file. Aborting");
         return NULL;
+    }
 
     while (!pObj->m_pLog->m_bQuit) {
 
@@ -1056,9 +1255,20 @@ threadWorker(void* pData)
             pObj->m_pLog->m_sendList.pop_front();
             pthread_mutex_unlock(&pObj->m_pLog->m_mutexSendQueue);
 
-            if (NULL == pEvent)
+            if (NULL == pEvent) {
                 continue;
-            pObj->m_pLog->writeEvent(pEvent);
+            }
+
+            // Only HLO object event is of interst to us
+            if ((VSCP_CLASS2_HLO == pEvent->vscp_class) &&
+                (VSCP2_TYPE_HLO_COMMAND == pEvent->vscp_type) &&
+                vscp_isSameGUID(pObj->m_pLog->m_guid.getGUID(), pEvent->GUID)) {
+                pObj->m_pLog->handleHLO(pEvent);
+                // Fall through and log event...
+            }
+
+            pObj->m_pLog->writeEvent2Log(pEvent);
+
             vscp_deleteEvent(pEvent);
             pEvent = NULL;
 

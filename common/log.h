@@ -35,9 +35,17 @@
 
 #define VSCP_LOG_LIST_MAX_MSG 2048
 
-// Flags
-#define LOG_FILE_OVERWRITE  1L // Overwrite
-#define LOG_FILE_VSCP_WORKS 2L // VSCP Works format
+#define TEMPLATE_LOGGER_CONF_FILE                                              \
+    "<?xml version = \"1.0\" encoding = \"UTF-8\" ?>"                          \
+    "<!-- Version 0.0.1 2020-01-23 -->"                                        \
+    "< setup debug =\"%s\" "                                                   \
+    "access= \"%s\" "                                                          \
+    "path-key=\"%s\" "                                                         \
+    "path-config=\"%s\" "                                                      \
+    "overwrite=\"%s\" "                                                        \
+    "worksfmt=\"%s\" "                                                         \
+    "filter=\"%s\" "                                                           \
+    "mask=\"%s\" />"
 
 // Forward declarations
 class CLogWrkThreadObj;
@@ -94,7 +102,7 @@ class CVSCPLog
       @param pEvent Pointer to VSCP event
       @return True on success.
      */
-    bool writeEvent(vscpEvent* pEvent);
+    bool writeEvent2Log(vscpEvent* pEvent);
 
     /*!
       Add event to send queue
@@ -149,7 +157,7 @@ class CVSCPLog
       Open the log file
       @return true on success.
     */
-    bool openFile(void);
+    bool openLogFile(void);
 
     /*!
       Read encryption key
@@ -176,14 +184,14 @@ class CVSCPLog
     /// Save on VSCP Works format if enabled
     bool m_bWorksFmt;
 
-    /// 256-bit cryptographic key for HLO
+    /// 256-bit cryptographic key for HLO (Not null if encryption)
     std::string m_pathKey;
 
     /*!
       256-bit cryptographic key for HLO
       Empty for no encryption of HLO events
     */
-    uint8_t m_Key[16];
+    uint8_t m_key[32];
 
     // Config file path
     std::string m_pathConfig;
@@ -195,7 +203,7 @@ class CVSCPLog
     std::string m_pathLogfile;
 
     /// The log stream
-    std::fstream m_logStream;
+    std::ofstream m_logStream;
 
     /// Pointer to worker thread
     pthread_t m_pWrkThread;
