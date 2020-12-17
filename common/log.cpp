@@ -424,18 +424,18 @@ CVSCPLog::doLoadConfig(void)
     }
 
     try {
-        if (m_j_config.contains("debug-enable") && m_j_config["debug-enable"].is_boolean()) { 
-            m_bDebug = m_j_config["debug-enable"].get<bool>();
+        if (m_j_config.contains("debug") && m_j_config["debug"].is_boolean()) { 
+            m_bDebug = m_j_config["debug"].get<bool>();
         } else {
-            syslog(LOG_ERR, "ReadConfig: Failed to read 'enable-debug'. Default will be used.");
+            syslog(LOG_ERR, "ReadConfig: Failed to read 'debug'. Default will be used.");
         }
 
         if (m_bDebug) {
-            syslog(LOG_DEBUG, "ReadConfig: 'debug-enable' set to %s", m_bDebug ? "true" : "false");
+            syslog(LOG_DEBUG, "ReadConfig: 'debug' set to %s", m_bDebug ? "true" : "false");
         }
     }
     catch (...) {
-        syslog(LOG_ERR, "ReadConfig: Failed to read 'debug-enable'. Default will be used.");
+        syslog(LOG_ERR, "ReadConfig: Failed to read 'debug'. Default will be used.");
     }
 
     try {
@@ -455,7 +455,7 @@ CVSCPLog::doLoadConfig(void)
 
     try {
         if (m_j_config.contains("path-config") && m_j_config["path-config"].is_string()) { 
-            m_pathConfig = m_j_config["path-config"].get<bool>();
+            m_pathConfig = m_j_config["path-config"].get<std::string>();
         } else {
             syslog(LOG_ERR, "ReadConfig: Failed to read 'path-config'. Must be set.");
             return false;
@@ -470,7 +470,79 @@ CVSCPLog::doLoadConfig(void)
         return false;
     }
 
+    try {
+        if (m_j_config.contains("overwrite") && m_j_config["overwrite"].is_boolean()) { 
+            m_bOverWrite = m_j_config["overwrite"].get<bool>();
+        } else {
+            syslog(LOG_ERR, "ReadConfig: Failed to read 'overwrite'. Default will be used.");
+        }
 
+        if (m_bDebug) {
+            syslog(LOG_DEBUG, "ReadConfig: 'overwrite' set to %s", m_bOverWrite ? "true" : "false");
+        }
+    }
+    catch (...) {
+        syslog(LOG_ERR, "ReadConfig: Failed to read 'overwrite'. Default will be used.");
+    }
+
+    try {
+        if (m_j_config.contains("worksfmt") && m_j_config["worksfmt"].is_boolean()) { 
+            m_bWorksFmt = m_j_config["worksfmt"].get<bool>();
+        } else {
+            syslog(LOG_ERR, "ReadConfig: Failed to read 'worksfmt'. Default will be used.");
+        }
+
+        if (m_bDebug) {
+            syslog(LOG_DEBUG, "ReadConfig: 'worksfmt' set to %s", m_bWorksFmt ? "true" : "false");
+        }
+    }
+    catch (...) {
+        syslog(LOG_ERR, "ReadConfig: Failed to read 'enable-overwrite'. Default will be used.");
+    }
+
+    try {
+        if (m_j_config.contains("filter") && m_j_config["filter"].is_string()) { 
+            std::string str = m_j_config["filter"].get<std::string>();
+            if (str.length()) {
+                if (!vscp_readFilterFromString(&m_vscpfilterTx, str)) {
+                    syslog(LOG_ERR, "ReadConfig: Failed to read 'filter' from string.");
+                }
+            }
+        } else {
+            syslog(LOG_ERR, "ReadConfig: Failed to read 'filter'.");
+        }
+
+        if (m_bDebug) {
+            std::string str;
+            vscp_writeFilterToString(str, &m_vscpfilterTx);
+            syslog(LOG_DEBUG, "ReadConfig: 'filter' set to %s", str.c_str());
+        }
+    }
+    catch (...) {
+        syslog(LOG_ERR, "ReadConfig: Failed to read 'filter'.");
+    }
+
+    try {
+        if (m_j_config.contains("mask") && m_j_config["mask"].is_string()) { 
+            std::string str = m_j_config["mask"].get<std::string>();
+            if (str.length()) {
+                if (!vscp_readMaskFromString(&m_vscpfilterTx, str)) {
+                    syslog(LOG_ERR, "ReadConfig: Failed to read 'mask' from string.");
+                }
+            }
+        } else {
+            syslog(LOG_ERR, "ReadConfig: Failed to read 'mask'.");
+        }
+
+        if (m_bDebug) {
+            std::string str;
+            vscp_writeMaskToString(str, &m_vscpfilterTx);
+            syslog(LOG_DEBUG, "ReadConfig: 'mask' set to %s", str.c_str());
+        }
+    }
+    catch (...) {
+        syslog(LOG_ERR, "ReadConfig: Failed to read 'mask'.");
+    }
 
     return true;
 }

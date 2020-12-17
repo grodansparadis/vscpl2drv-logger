@@ -44,18 +44,6 @@ using namespace kainjow::mustache;
 
 #define VSCP_LOG_LIST_MAX_MSG 2048
 
-#define TEMPLATE_LOGGER_CONF_FILE                                              \
-    "<?xml version = \"1.0\" encoding = \"UTF-8\" ?>"                          \
-    "<!-- Version 0.0.1 2020-01-23 -->"                                        \
-    "< setup debug =\"%s\" "                                                   \
-    "access= \"%s\" "                                                          \
-    "path-key=\"%s\" "                                                         \
-    "path-config=\"%s\" "                                                      \
-    "overwrite=\"%s\" "                                                        \
-    "worksfmt=\"%s\" "                                                         \
-    "filter=\"%s\" "                                                           \
-    "mask=\"%s\" />"
-
 // Forward declarations
 class CLogWrkThreadObj;
 class CHLO;
