@@ -24,12 +24,21 @@
 #if !defined(VSCPLOG_H__6F5CD90E_ACF7_459A_9ACB_849A57595639__INCLUDED_)
 #define VSCPLOG_H__6F5CD90E_ACF7_459A_9ACB_849A57595639__INCLUDED_
 
+#include <vscp.h>
+#include <vscpremotetcpif.h>
+
+#include <json.hpp>  // Needs C++11  -std=c++11
+#include <mustache.hpp>
+
 #include <fstream>
 #include <list>
 #include <string>
 
-#include <vscp.h>
-#include <vscpremotetcpif.h>
+// https://github.com/nlohmann/json
+using json = nlohmann::json;
+
+using namespace kainjow::mustache;
+
 
 #define VSCP_LEVEL2_DLL_LOGGER_OBJ_MUTEX "___VSCP__DLL_L2LOGGER_OBJ_MUTEX____"
 
@@ -163,19 +172,23 @@ class CVSCPLog
       Read encryption key
       @return key size or zero on failure.
     */
-    size_t readEncryptionKey(void);
+    //size_t readEncryptionKey(void);
 
   public:
+
+    // JSON configuration object
+    json m_j_config;
+
     /// Run flag
     bool m_bQuit;
+
+    /// Path to configuration file
+    std::string m_path;
 
     /// True enables debug output to syslog
     bool m_bDebug;
 
-    /// True if config can be read onm command
-    bool m_bRead;
-
-    /// True if config can be written on comand
+    /// True enables config write
     bool m_bWrite;
 
     /// Rewrite the log file when the driver starts if enabled
@@ -184,15 +197,6 @@ class CVSCPLog
     /// Save on VSCP Works format if enabled
     bool m_bWorksFmt;
 
-    /// 256-bit cryptographic key for HLO (Not null if encryption)
-    std::string m_pathKey;
-
-    /*!
-      256-bit cryptographic key for HLO
-      Empty for no encryption of HLO events
-    */
-    uint8_t m_key[32];
-
     // Config file path
     std::string m_pathConfig;
 
@@ -200,7 +204,7 @@ class CVSCPLog
     cguid m_guid;
 
     /// Path to logfile
-    std::string m_pathLogfile;
+    std::string m_pathLogFile;
 
     /// The log stream
     std::ofstream m_logStream;

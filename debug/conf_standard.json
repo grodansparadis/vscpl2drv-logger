@@ -1,0 +1,9 @@
+{
+    "enable-debug" : true,
+    "enable-write" : false,
+    "path-config" : "/tmp/vscplogger.log",
+    "overwrite" : false,
+    "worksfmt" : true,
+    "filter" : "0,0x0000,0x0000,00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00",
+    "mask" : "0,0x0000,0x0000,00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00" 
+}

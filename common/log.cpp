@@ -43,10 +43,19 @@
 #include <vscpdatetime.h>
 #include <vscphelper.h>
 
+#include <json.hpp>  // Needs C++11  -std=c++11
+#include <mustache.hpp>
+
 #include "log.h"
 
+// https://github.com/nlohmann/json
+using json = nlohmann::json;
+
+using namespace kainjow::mustache;
+
+
 // Buffer size for XML parser
-#define XML_BUFF_SIZE 10000
+//#define XML_BUFF_SIZE 10000
 
 // Forward declarations
 void*
@@ -71,12 +80,10 @@ threadWorker(void* pData);
 CVSCPLog::CVSCPLog()
 {
     m_bQuit      = false;
-    m_bRead      = false;
     m_bWrite     = false;
     m_bQuit      = false;
     m_bOverWrite = false;
     m_bWorksFmt  = true;
-    memset(m_key, 0, 16); // Clear encryption key
 
     vscp_clearVSCPFilter(&m_vscpfilterTx); // Accept all TX events
 
@@ -126,145 +133,145 @@ CVSCPLog::~CVSCPLog()
 
 // ----------------------------------------------------------------------------
 
-int depth_setup_parser = 0;
+// int depth_setup_parser = 0;
 
-void
-startSetupParser(void* data, const char* name, const char** attr)
-{
-    CVSCPLog* pLog = (CVSCPLog*)data;
-    if (NULL == pLog)
-        return;
+// void
+// startSetupParser(void* data, const char* name, const char** attr)
+// {
+//     CVSCPLog* pLog = (CVSCPLog*)data;
+//     if (NULL == pLog)
+//         return;
 
-    if ((0 == strcmp(name, "setup")) && (0 == depth_setup_parser)) {
+//     if ((0 == strcmp(name, "setup")) && (0 == depth_setup_parser)) {
 
-        for (int i = 0; attr[i]; i += 2) {
+//         for (int i = 0; attr[i]; i += 2) {
 
-            std::string attribute = attr[i + 1];
-            vscp_trim(attribute);
+//             std::string attribute = attr[i + 1];
+//             vscp_trim(attribute);
 
-            if (0 == strcmp(attr[i], "debug")) {
-                if (!attribute.empty()) {
-                    if (0 == vscp_strcasecmp(attribute.c_str(), "TRUE")) {
-                        pLog->m_bDebug = true;
-                    } else {
-                        pLog->m_bDebug = false;
-                    }
-                    if (pLog->m_bDebug) {
-                        syslog(LOG_DEBUG,
-                               "[vscpl2drv-logger] 'bDebug' set to true.");
-                    }
-                }
-            } else if (0 == strcasecmp(attr[i], "access")) {
-                if (!attribute.empty()) {
-                    vscp_makeUpper(attribute);
-                    if (std::string::npos != attribute.find("W")) {
-                        pLog->m_bWrite = true;
-                    } else {
-                        pLog->m_bWrite = false;
-                    }
-                    if (std::string::npos != attribute.find("R")) {
-                        pLog->m_bRead = true;
-                    } else {
-                        pLog->m_bRead = false;
-                    }
-                }
-            } else if (0 == strcmp(attr[i], "path-config")) {
-                if (!attribute.empty()) {
-                    pLog->m_pathLogfile = attribute;
-                }
-                if (pLog->m_bDebug) {
-                    syslog(LOG_DEBUG,
-                           "[vscpl2drv-logger] Log file path set to [%s].",
-                           pLog->m_pathLogfile.c_str());
-                }
-            } else if (0 == strcmp(attr[i], "filter")) {
-                if (!attribute.empty()) {
-                    if (!vscp_readFilterFromString(&pLog->m_vscpfilterTx,
-                                                   attribute)) {
-                        syslog(LOG_ERR,
-                               "[vscpl2drv-logger] Unable to read event "
-                               "receive filter.");
-                    } else if (pLog->m_bDebug) {
-                        std::string str;
-                        vscp_writeFilterToString(str, &pLog->m_vscpfilterTx);
-                        syslog(
-                          LOG_DEBUG,
-                          "[vscpl2drv-logger] Tx filter set to set to [%s].",
-                          str.c_str());
-                    }
-                }
-            } else if (0 == strcmp(attr[i], "mask")) {
-                if (!attribute.empty()) {
-                    if (!vscp_readMaskFromString(&pLog->m_vscpfilterTx,
-                                                 attribute)) {
-                        syslog(LOG_ERR,
-                               "[vscpl2drv-logger] Unable to read event "
-                               "receive mask.");
-                    } else if (pLog->m_bDebug) {
-                        std::string str;
-                        vscp_writeMaskToString(str, &pLog->m_vscpfilterTx);
-                        syslog(LOG_DEBUG,
-                               "[vscpl2drv-logger] Tx mask set to set to [%s].",
-                               str.c_str());
-                    }
-                }
-            } else if (0 == strcmp(attr[i], "overwrite")) {
-                if (!attribute.empty()) {
-                    if (0 == vscp_strcasecmp(attribute.c_str(), "TRUE")) {
-                        pLog->m_bOverWrite = true;
-                    } else {
-                        pLog->m_bOverWrite = false;
-                    }
-                    if (pLog->m_bDebug) {
-                        syslog(LOG_DEBUG,
-                               "[vscpl2drv-logger] 'boverwrite' set to %s].",
-                               pLog->m_bOverWrite ? "true" : "false");
-                    }
-                }
-            } else if (0 == strcmp(attr[i], "worksfmt")) {
-                if (!attribute.empty()) {
-                    if (0 == vscp_strcasecmp(attribute.c_str(), "TRUE")) {
-                        pLog->m_bWorksFmt = true;
-                    } else {
-                        pLog->m_bWorksFmt = false;
-                    }
-                    if (pLog->m_bDebug) {
-                        syslog(LOG_DEBUG,
-                               "[vscpl2drv-logger] 'bworksfmt' set to %s].",
-                               pLog->m_bWorksFmt ? "true" : "false");
-                    }
-                }
-            } else if (0 == strcmp(attr[i], "path-key")) {
-                size_t n;
-                if (!attribute.empty()) {
-                    pLog->m_pathKey = attribute;
-                    if (0 == (n = pLog->readEncryptionKey())) {
-                        syslog(LOG_INFO,
-                               "[vscpl2drv-logger] Could not read encryption "
-                               "key. Will not use encryption.");
-                    } else {
-                        if (pLog->m_bDebug) {
-                            syslog(
-                              LOG_DEBUG,
-                              "[vscpl2drv-logger] Encryption key read from "
-                              "[%s] length: %zu.",
-                              pLog->m_pathKey.c_str(),
-                              n);
-                        }
-                    }
-                }
-            }
-        }
-    }
+//             if (0 == strcmp(attr[i], "debug")) {
+//                 if (!attribute.empty()) {
+//                     if (0 == vscp_strcasecmp(attribute.c_str(), "TRUE")) {
+//                         pLog->m_bDebug = true;
+//                     } else {
+//                         pLog->m_bDebug = false;
+//                     }
+//                     if (pLog->m_bDebug) {
+//                         syslog(LOG_DEBUG,
+//                                "[vscpl2drv-logger] 'bDebug' set to true.");
+//                     }
+//                 }
+//             } else if (0 == strcasecmp(attr[i], "access")) {
+//                 if (!attribute.empty()) {
+//                     vscp_makeUpper(attribute);
+//                     if (std::string::npos != attribute.find("W")) {
+//                         pLog->m_bWrite = true;
+//                     } else {
+//                         pLog->m_bWrite = false;
+//                     }
+//                     if (std::string::npos != attribute.find("R")) {
+//                         pLog->m_bRead = true;
+//                     } else {
+//                         pLog->m_bRead = false;
+//                     }
+//                 }
+//             } else if (0 == strcmp(attr[i], "path-config")) {
+//                 if (!attribute.empty()) {
+//                     pLog->m_pathLogfile = attribute;
+//                 }
+//                 if (pLog->m_bDebug) {
+//                     syslog(LOG_DEBUG,
+//                            "[vscpl2drv-logger] Log file path set to [%s].",
+//                            pLog->m_pathLogfile.c_str());
+//                 }
+//             } else if (0 == strcmp(attr[i], "filter")) {
+//                 if (!attribute.empty()) {
+//                     if (!vscp_readFilterFromString(&pLog->m_vscpfilterTx,
+//                                                    attribute)) {
+//                         syslog(LOG_ERR,
+//                                "[vscpl2drv-logger] Unable to read event "
+//                                "receive filter.");
+//                     } else if (pLog->m_bDebug) {
+//                         std::string str;
+//                         vscp_writeFilterToString(str, &pLog->m_vscpfilterTx);
+//                         syslog(
+//                           LOG_DEBUG,
+//                           "[vscpl2drv-logger] Tx filter set to set to [%s].",
+//                           str.c_str());
+//                     }
+//                 }
+//             } else if (0 == strcmp(attr[i], "mask")) {
+//                 if (!attribute.empty()) {
+//                     if (!vscp_readMaskFromString(&pLog->m_vscpfilterTx,
+//                                                  attribute)) {
+//                         syslog(LOG_ERR,
+//                                "[vscpl2drv-logger] Unable to read event "
+//                                "receive mask.");
+//                     } else if (pLog->m_bDebug) {
+//                         std::string str;
+//                         vscp_writeMaskToString(str, &pLog->m_vscpfilterTx);
+//                         syslog(LOG_DEBUG,
+//                                "[vscpl2drv-logger] Tx mask set to set to [%s].",
+//                                str.c_str());
+//                     }
+//                 }
+//             } else if (0 == strcmp(attr[i], "overwrite")) {
+//                 if (!attribute.empty()) {
+//                     if (0 == vscp_strcasecmp(attribute.c_str(), "TRUE")) {
+//                         pLog->m_bOverWrite = true;
+//                     } else {
+//                         pLog->m_bOverWrite = false;
+//                     }
+//                     if (pLog->m_bDebug) {
+//                         syslog(LOG_DEBUG,
+//                                "[vscpl2drv-logger] 'boverwrite' set to %s].",
+//                                pLog->m_bOverWrite ? "true" : "false");
+//                     }
+//                 }
+//             } else if (0 == strcmp(attr[i], "worksfmt")) {
+//                 if (!attribute.empty()) {
+//                     if (0 == vscp_strcasecmp(attribute.c_str(), "TRUE")) {
+//                         pLog->m_bWorksFmt = true;
+//                     } else {
+//                         pLog->m_bWorksFmt = false;
+//                     }
+//                     if (pLog->m_bDebug) {
+//                         syslog(LOG_DEBUG,
+//                                "[vscpl2drv-logger] 'bworksfmt' set to %s].",
+//                                pLog->m_bWorksFmt ? "true" : "false");
+//                     }
+//                 }
+//             } else if (0 == strcmp(attr[i], "path-key")) {
+//                 size_t n;
+//                 if (!attribute.empty()) {
+//                     pLog->m_pathKey = attribute;
+//                     if (0 == (n = pLog->readEncryptionKey())) {
+//                         syslog(LOG_INFO,
+//                                "[vscpl2drv-logger] Could not read encryption "
+//                                "key. Will not use encryption.");
+//                     } else {
+//                         if (pLog->m_bDebug) {
+//                             syslog(
+//                               LOG_DEBUG,
+//                               "[vscpl2drv-logger] Encryption key read from "
+//                               "[%s] length: %zu.",
+//                               pLog->m_pathKey.c_str(),
+//                               n);
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//     }
 
-    depth_setup_parser++;
-}
+//     depth_setup_parser++;
+// }
 
-void
-endSetupParser(void* data, const char* name)
-{
-    depth_setup_parser--;
-}
+// void
+// endSetupParser(void* data, const char* name)
+// {
+//     depth_setup_parser--;
+// }
 
 // ----------------------------------------------------------------------------
 
@@ -375,37 +382,95 @@ CVSCPLog::setMask(vscpEvent* pMask)
 bool
 CVSCPLog::doLoadConfig(void)
 {
-    FILE* fp;
+    // FILE* fp;
 
-    fp = fopen(m_pathConfig.c_str(), "r");
-    if (NULL == fp) {
-        syslog(LOG_ERR,
-               "[vscpl2drv-logger] Failed to open configuration file [%s]",
-               m_pathConfig.c_str());
+    // fp = fopen(m_pathConfig.c_str(), "r");
+    // if (NULL == fp) {
+    //     syslog(LOG_ERR,
+    //            "[vscpl2drv-logger] Failed to open configuration file [%s]",
+    //            m_pathConfig.c_str());
+    //     return false;
+    // }
+
+    // XML_Parser xmlParser = XML_ParserCreate("UTF-8");
+    // XML_SetUserData(xmlParser, this);
+    // XML_SetElementHandler(xmlParser, startSetupParser, endSetupParser);
+
+    // void* buf = XML_GetBuffer(xmlParser, XML_BUFF_SIZE);
+
+    // size_t file_size = 0;
+    // file_size        = fread(buf, sizeof(char), XML_BUFF_SIZE, fp);
+    // fclose(fp);
+
+    // if (XML_STATUS_OK !=
+    //     XML_ParseBuffer(xmlParser, file_size, file_size == 0)) {
+    //     enum XML_Error errcode = XML_GetErrorCode(xmlParser);
+    //     syslog(LOG_ERR,
+    //            "[vscpl2drv-logger] Failed parse XML setup [%s].",
+    //            XML_ErrorString(errcode));
+    //     XML_ParserFree(xmlParser);
+    //     return false;
+    // }
+
+    // XML_ParserFree(xmlParser);
+
+    try {
+        std::ifstream in(m_path, std::ifstream::in);
+        in >> m_j_config;
+    }
+    catch (...) {
+        syslog(LOG_ERR, "[vscpl2drv-automation] Failed to parse JSON configuration.");
         return false;
     }
 
-    XML_Parser xmlParser = XML_ParserCreate("UTF-8");
-    XML_SetUserData(xmlParser, this);
-    XML_SetElementHandler(xmlParser, startSetupParser, endSetupParser);
+    try {
+        if (m_j_config.contains("debug-enable") && m_j_config["debug-enable"].is_boolean()) { 
+            m_bDebug = m_j_config["debug-enable"].get<bool>();
+        } else {
+            syslog(LOG_ERR, "ReadConfig: Failed to read 'enable-debug'. Default will be used.");
+        }
 
-    void* buf = XML_GetBuffer(xmlParser, XML_BUFF_SIZE);
+        if (m_bDebug) {
+            syslog(LOG_DEBUG, "ReadConfig: 'debug-enable' set to %s", m_bDebug ? "true" : "false");
+        }
+    }
+    catch (...) {
+        syslog(LOG_ERR, "ReadConfig: Failed to read 'debug-enable'. Default will be used.");
+    }
 
-    size_t file_size = 0;
-    file_size        = fread(buf, sizeof(char), XML_BUFF_SIZE, fp);
-    fclose(fp);
+    try {
+        if (m_j_config.contains("write-enable") && m_j_config["write-enable"].is_boolean()) { 
+            m_bDebug = m_j_config["write-enable"].get<bool>();
+        } else {
+            syslog(LOG_ERR, "ReadConfig: Failed to read 'write-debug'. Default will be used.");
+        }
 
-    if (XML_STATUS_OK !=
-        XML_ParseBuffer(xmlParser, file_size, file_size == 0)) {
-        enum XML_Error errcode = XML_GetErrorCode(xmlParser);
-        syslog(LOG_ERR,
-               "[vscpl2drv-logger] Failed parse XML setup [%s].",
-               XML_ErrorString(errcode));
-        XML_ParserFree(xmlParser);
+        if (m_bDebug) {
+            syslog(LOG_DEBUG, "ReadConfig: 'write-enable' set to %s", m_bWrite ? "true" : "false");
+        }
+    }
+    catch (...) {
+        syslog(LOG_ERR, "ReadConfig: Failed to read 'write-enable'. Default will be used.");
+    }
+
+    try {
+        if (m_j_config.contains("path-config") && m_j_config["path-config"].is_string()) { 
+            m_pathConfig = m_j_config["path-config"].get<bool>();
+        } else {
+            syslog(LOG_ERR, "ReadConfig: Failed to read 'path-config'. Must be set.");
+            return false;
+        }
+
+        if (m_bDebug) {
+            syslog(LOG_DEBUG, "ReadConfig: 'path-config' set to %s", m_pathConfig.c_str());
+        }
+    }
+    catch (...) {
+        syslog(LOG_ERR, "ReadConfig: Failed to read 'path-config'. Must be set.");
         return false;
     }
 
-    XML_ParserFree(xmlParser);
+
 
     return true;
 }
@@ -417,122 +482,120 @@ CVSCPLog::doLoadConfig(void)
 bool
 CVSCPLog::doSaveConfig(void)
 {
-    std::string access;
-    std::string filter;
-    std::string mask;
+    // std::string access;
+    // std::string filter;
+    // std::string mask;
 
-    if (m_bRead) {
-        access = "r";
-    }
+    // access = "r";
 
-    if (m_bWrite) {
-        access = "w";
-    }
+    // if (m_bWrite) {
+    //     access = "w";
+    // }
 
-    vscp_writeFilterToString(filter, &m_vscpfilterTx);
-    vscp_writeMaskToString(mask, &m_vscpfilterTx);
+    // vscp_writeFilterToString(filter, &m_vscpfilterTx);
+    // vscp_writeMaskToString(mask, &m_vscpfilterTx);
 
-    std::string cfg = vscp_str_format(TEMPLATE_LOGGER_CONF_FILE,
-                                      (m_bDebug ? "true" : "false"),
-                                      access.c_str(),
-                                      m_pathKey.c_str(),
-                                      m_pathConfig.c_str(),
-                                      (m_bOverWrite ? "true" : "false"),
-                                      (m_bWorksFmt ? "true" : "false"),
-                                      filter.c_str(),
-                                      mask.c_str());
+    // std::string cfg = vscp_str_format(TEMPLATE_LOGGER_CONF_FILE,
+    //                                   (m_bDebug ? "true" : "false"),
+    //                                   access.c_str(),
+    //                                   m_pathKey.c_str(),
+    //                                   m_pathConfig.c_str(),
+    //                                   (m_bOverWrite ? "true" : "false"),
+    //                                   (m_bWorksFmt ? "true" : "false"),
+    //                                   filter.c_str(),
+    //                                   mask.c_str());
 
-    try {
-    std::ofstream fs;
-    fs.open (m_pathConfig);
-    fs << cfg;
-    fs.close();
-    } catch (...) {
-        syslog(LOG_ERR, "[vscpl2drv-logger] Failed to save configuration file.");    
-        return false;
-    }
+    // try {
+    // std::ofstream fs;
+    // fs.open (m_pathConfig);
+    // fs << cfg;
+    // fs.close();
+    // } catch (...) {
+    //     syslog(LOG_ERR, "[vscpl2drv-logger] Failed to save configuration file.");    
+    //     return false;
+    // }
 
     return true;
 }
 
 // ----------------------------------------------------------------------------
 
-int depth_hlo_parser = 0;
+// int depth_hlo_parser = 0;
 
-void
-startHLOParser(void* data, const char* name, const char** attr)
-{
-    CHLO* pObj = (CHLO*)data;
-    if (NULL == pObj) {
-        return;
-    }
+// void
+// startHLOParser(void* data, const char* name, const char** attr)
+// {
+//     CHLO* pObj = (CHLO*)data;
+//     if (NULL == pObj) {
+//         return;
+//     }
 
-    if ((0 == strcmp(name, "vscp-cmd")) && (0 == depth_setup_parser)) {
+//     if ((0 == strcmp(name, "vscp-cmd")) && (0 == depth_setup_parser)) {
 
-        for (int i = 0; attr[i]; i += 2) {
+//         for (int i = 0; attr[i]; i += 2) {
 
-            std::string attribute = attr[i + 1];
-            vscp_trim(attribute);
+//             std::string attribute = attr[i + 1];
+//             vscp_trim(attribute);
 
-            if (0 == strcasecmp(attr[i], "op")) {
-                if (!attribute.empty()) {
-                    pObj->m_op = vscp_readStringValue(attribute);
-                    vscp_makeUpper(attribute);
-                    if (pObj->m_bDebug) {
-                        syslog(LOG_DEBUG,
-                               "[vscpl2drv-logger] <vscp-cmd op=\"%s\" ",
-                               attribute.c_str());
-                    }
-                    if (attribute == "VSCP-NOOP") {
-                        pObj->m_op = HLO_OP_NOOP;
-                    } else if (attribute == "VSCP-READVAR") {
-                        pObj->m_op = HLO_OP_READ_VAR;
-                    } else if (attribute == "VSCP-WRITEVAR") {
-                        pObj->m_op = HLO_OP_WRITE_VAR;
-                    } else if (attribute == "VSCP-LOAD") {
-                        pObj->m_op = HLO_OP_LOAD;
-                    } else if (attribute == "VSCP-SAVE") {
-                        pObj->m_op = HLO_OP_SAVE;
-                    } else {
-                        pObj->m_op = HLO_OP_UNKNOWN;
-                    }
-                }
-            } else if (0 == strcasecmp(attr[i], "name")) {
-                if (!attribute.empty()) {
-                    vscp_makeUpper(attribute);
-                    pObj->m_name = attribute;
-                }
-            } else if (0 == strcasecmp(attr[i], "type")) {
-                if (!attribute.empty()) {
-                    pObj->m_varType = vscp_readStringValue(attribute);
-                }
-            } else if (0 == strcasecmp(attr[i], "value")) {
-                if (!attribute.empty()) {
-                    if (vscp_base64_std_decode(attribute)) {
-                        pObj->m_value = attribute;
-                    }
-                }
-            } else if (0 == strcasecmp(attr[i], "full")) {
-                if (!attribute.empty()) {
-                    vscp_makeUpper(attribute);
-                    if ("TRUE" == attribute) {
-                        pObj->m_bFull = true;
-                    } else {
-                        pObj->m_bFull = false;
-                    }
-                }
-            }
-        }
-    }
+//             if (0 == strcasecmp(attr[i], "op")) {
+//                 if (!attribute.empty()) {
+//                     pObj->m_op = vscp_readStringValue(attribute);
+//                     vscp_makeUpper(attribute);
+//                     if (pObj->m_bDebug) {
+//                         syslog(LOG_DEBUG,
+//                                "[vscpl2drv-logger] <vscp-cmd op=\"%s\" ",
+//                                attribute.c_str());
+//                     }
+//                     if (attribute == "VSCP-NOOP") {
+//                         pObj->m_op = HLO_OP_NOOP;
+//                     } else if (attribute == "VSCP-READVAR") {
+//                         pObj->m_op = HLO_OP_READ_VAR;
+//                     } else if (attribute == "VSCP-WRITEVAR") {
+//                         pObj->m_op = HLO_OP_WRITE_VAR;
+//                     } else if (attribute == "VSCP-LOAD") {
+//                         pObj->m_op = HLO_OP_LOAD;
+//                     } else if (attribute == "VSCP-SAVE") {
+//                         pObj->m_op = HLO_OP_SAVE;
+//                     } else {
+//                         pObj->m_op = HLO_OP_UNKNOWN;
+//                     }
+//                 }
+//             } else if (0 == strcasecmp(attr[i], "name")) {
+//                 if (!attribute.empty()) {
+//                     vscp_makeUpper(attribute);
+//                     pObj->m_name = attribute;
+//                 }
+//             } else if (0 == strcasecmp(attr[i], "type")) {
+//                 if (!attribute.empty()) {
+//                     pObj->m_varType = vscp_readStringValue(attribute);
+//                 }
+//             } else if (0 == strcasecmp(attr[i], "value")) {
+//                 if (!attribute.empty()) {
+//                     if (vscp_base64_std_decode(attribute)) {
+//                         pObj->m_value = attribute;
+//                     }
+//                 }
+//             } else if (0 == strcasecmp(attr[i], "full")) {
+//                 if (!attribute.empty()) {
+//                     vscp_makeUpper(attribute);
+//                     if ("TRUE" == attribute) {
+//                         pObj->m_bFull = true;
+//                     } else {
+//                         pObj->m_bFull = false;
+//                     }
+//                 }
+//             }
+//         }
+//     }
 
-    depth_hlo_parser++;
-}
+//     depth_hlo_parser++;
+// }
 
-void
-endHLOParser(void* data, const char* name)
-{
-    depth_hlo_parser--;
-}
+// void
+// endHLOParser(void* data, const char* name)
+// {
+//     depth_hlo_parser--;
+// }
 
 // ----------------------------------------------------------------------------
 
@@ -543,54 +606,54 @@ endHLOParser(void* data, const char* name)
 bool
 CVSCPLog::parseHLO(uint16_t size, uint8_t* inbuf, CHLO* phlo)
 {
-    uint8_t outbuf[VSCP_MAX_DATA];
+    // uint8_t outbuf[VSCP_MAX_DATA];
 
-    // GUID + type = 17 + dummy payload size=1
-    if (size < 18) {
-        syslog(LOG_ERR,
-               "[vscpl2drv-logger] HLO parser: HLO buffer size is wring.");
-        return false;
-    }
+    // // GUID + type = 17 + dummy payload size=1
+    // if (size < 18) {
+    //     syslog(LOG_ERR,
+    //            "[vscpl2drv-logger] HLO parser: HLO buffer size is wring.");
+    //     return false;
+    // }
 
-    // Check pointers
-    if (NULL == inbuf) {
-        syslog(LOG_ERR,
-               "[vscpl2drv-logger] HLO parser: HLO in-buffer pointer is NULL.");
-        return false;
-    }
+    // // Check pointers
+    // if (NULL == inbuf) {
+    //     syslog(LOG_ERR,
+    //            "[vscpl2drv-logger] HLO parser: HLO in-buffer pointer is NULL.");
+    //     return false;
+    // }
 
-    if (NULL == phlo) {
-        syslog(LOG_ERR,
-               "[vscpl2drv-logger] HLO parser: HLO obj pointer is NULL.");
-        return false;
-    }
+    // if (NULL == phlo) {
+    //     syslog(LOG_ERR,
+    //            "[vscpl2drv-logger] HLO parser: HLO obj pointer is NULL.");
+    //     return false;
+    // }
 
-    // Decrypt if needed
-    if (vscp_fileExists(m_pathKey)) {
-        vscp_decryptFrame(outbuf,
-                          inbuf + 16,
-                          size - 16,
-                          m_key,
-                          NULL,
-                          VSCP_ENCRYPTION_AES256);
-    }
+    // // Decrypt if needed
+    // if (vscp_fileExists(m_pathKey)) {
+    //     vscp_decryptFrame(outbuf,
+    //                       inbuf + 16,
+    //                       size - 16,
+    //                       m_key,
+    //                       NULL,
+    //                       VSCP_ENCRYPTION_AES256);
+    // }
 
-    XML_Parser xmlParser = XML_ParserCreate("UTF-8");
-    XML_SetUserData(xmlParser, this);
-    XML_SetElementHandler(xmlParser, startHLOParser, endHLOParser);
+    // XML_Parser xmlParser = XML_ParserCreate("UTF-8");
+    // XML_SetUserData(xmlParser, this);
+    // XML_SetElementHandler(xmlParser, startHLOParser, endHLOParser);
 
-    void* buf = XML_GetBuffer(xmlParser, XML_BUFF_SIZE);
+    // void* buf = XML_GetBuffer(xmlParser, XML_BUFF_SIZE);
 
-    // Copy in the HLO object
-    memcpy(buf, inbuf, size);
+    // // Copy in the HLO object
+    // memcpy(buf, inbuf, size);
 
-    if (!XML_ParseBuffer(xmlParser, size, size == 0)) {
-        syslog(LOG_ERR, "[vscpl2drv-logger] Failed parse XML setup.");
-        XML_ParserFree(xmlParser);
-        return false;
-    }
+    // if (!XML_ParseBuffer(xmlParser, size, size == 0)) {
+    //     syslog(LOG_ERR, "[vscpl2drv-logger] Failed parse XML setup.");
+    //     XML_ParserFree(xmlParser);
+    //     return false;
+    // }
 
-    XML_ParserFree(xmlParser);
+    // XML_ParserFree(xmlParser);
 
     return true;
 }
@@ -602,379 +665,380 @@ CVSCPLog::parseHLO(uint16_t size, uint8_t* inbuf, CHLO* phlo)
 bool
 CVSCPLog::handleHLO(vscpEvent* pEvent)
 {
-    char buf[512]; // Working buffer
-    vscpEventEx ex;
+    // char buf[512]; // Working buffer
+    // vscpEventEx ex;
 
-    // Check pointers
-    if (NULL == pEvent) {
-        syslog(LOG_ERR, "[vscpl2drv-logger] HLO handler: NULL event pointer.");
-        return false;
-    }
+    // // Check pointers
+    // if (NULL == pEvent) {
+    //     syslog(LOG_ERR, "[vscpl2drv-logger] HLO handler: NULL event pointer.");
+    //     return false;
+    // }
 
-    CHLO hlo;
-    hlo.m_bDebug = m_bDebug;
-    if (!parseHLO(pEvent->sizeData, pEvent->pdata, &hlo)) {
-        syslog(LOG_ERR, "[vscpl2drv-logger] Failed to parse HLO.");
-        return false;
-    }
+    // CHLO hlo;
+    // hlo.m_bDebug = m_bDebug;
+    // if (!parseHLO(pEvent->sizeData, pEvent->pdata, &hlo)) {
+    //     syslog(LOG_ERR, "[vscpl2drv-logger] Failed to parse HLO.");
+    //     return false;
+    // }
 
-    ex.obid      = 0;
-    ex.head      = 0;
-    ex.timestamp = vscp_makeTimeStamp();
-    vscp_setEventExToNow(&ex); // Set time to current time
-    ex.vscp_class = VSCP_CLASS2_HLO;
-    ex.vscp_type  = VSCP2_TYPE_HLO_RESPONSE;
-    m_guid.writeGUID(ex.GUID);
+    // ex.obid      = 0;
+    // ex.head      = 0;
+    // ex.timestamp = vscp_makeTimeStamp();
+    // vscp_setEventExToNow(&ex); // Set time to current time
+    // ex.vscp_class = VSCP_CLASS2_HLO;
+    // ex.vscp_type  = VSCP2_TYPE_HLO_RESPONSE;
+    // m_guid.writeGUID(ex.GUID);
 
-    switch (hlo.m_op) {
+    // switch (hlo.m_op) {
 
-        case HLO_OP_NOOP:
-            // Send positive response
-            sprintf(buf,
-                    HLO_CMD_REPLY_TEMPLATE,
-                    "noop",
-                    "OK",
-                    "NOOP commaned executed correctly.");
+    //     case HLO_OP_NOOP:
+    //         // Send positive response
+    //         sprintf(buf,
+    //                 HLO_CMD_REPLY_TEMPLATE,
+    //                 "noop",
+    //                 "OK",
+    //                 "NOOP commaned executed correctly.");
 
-            break;
+    //         break;
 
-        case HLO_OP_READ_VAR:
-            if (m_bRead) {
-                if ("DEBUG" == hlo.m_name) {
-                    sprintf(buf,
-                            HLO_READ_VAR_REPLY_TEMPLATE,
-                            "debug",
-                            "OK",
-                            VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
-                            vscp_convertToBase64(m_bDebug ? "true" : "false")
-                              .c_str());
-                } else if ("OVERWRITE" == hlo.m_name) {
-                    sprintf(buf,
-                            HLO_READ_VAR_REPLY_TEMPLATE,
-                            "overwrite",
-                            "OK",
-                            VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
-                            vscp_convertToBase64(m_bDebug ? "true" : "false")
-                              .c_str());
-                } else if ("WORKSFMT" == hlo.m_name) {
-                    sprintf(buf,
-                            HLO_READ_VAR_REPLY_TEMPLATE,
-                            "worksfmt",
-                            "OK",
-                            VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
-                            vscp_convertToBase64(m_bDebug ? "true" : "false")
-                              .c_str());
-                } else if ("PATH-CONFIG" == hlo.m_name) {
-                    sprintf(buf,
-                            HLO_READ_VAR_REPLY_TEMPLATE,
-                            "path-config",
-                            "OK",
-                            VSCP_REMOTE_VARIABLE_CODE_STRING,
-                            vscp_convertToBase64(m_pathConfig.c_str()).c_str());
-                } else if ("FILTER" == hlo.m_name) {
-                    std::string str, filter;
-                    vscp_writeFilterToString(filter, &m_vscpfilterTx);
-                    vscp_writeMaskToString(str, &m_vscpfilterTx);
-                    filter += str;
-                    sprintf(buf,
-                            HLO_READ_VAR_REPLY_TEMPLATE,
-                            "filter",
-                            "OK",
-                            VSCP_REMOTE_VARIABLE_CODE_FILTER,
-                            vscp_convertToBase64(filter.c_str()).c_str());
-                } else {
-                    sprintf(
-                      buf,
-                      HLO_READ_VAR_ERR_REPLY_TEMPLATE,
-                      hlo.m_name.c_str(),
-                      ERR_VARIABLE_UNKNOWN,
-                      vscp_convertToBase64(std::string("Unknown variable"))
-                        .c_str());
-                }
-            } else {
-                // Reads not allowed
-                sprintf(
-                      buf,
-                      HLO_READ_VAR_ERR_REPLY_TEMPLATE,
-                      hlo.m_name.c_str(),
-                      ERR_VARIABLE_PERMISSION,
-                      vscp_convertToBase64(std::string("Not allowed to read variable"))
-                        .c_str());
-            }
-            break;
+    //     case HLO_OP_READ_VAR:
+    //         if (m_bRead) {
+    //             if ("DEBUG" == hlo.m_name) {
+    //                 sprintf(buf,
+    //                         HLO_READ_VAR_REPLY_TEMPLATE,
+    //                         "debug",
+    //                         "OK",
+    //                         VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
+    //                         vscp_convertToBase64(m_bDebug ? "true" : "false")
+    //                           .c_str());
+    //             } else if ("OVERWRITE" == hlo.m_name) {
+    //                 sprintf(buf,
+    //                         HLO_READ_VAR_REPLY_TEMPLATE,
+    //                         "overwrite",
+    //                         "OK",
+    //                         VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
+    //                         vscp_convertToBase64(m_bDebug ? "true" : "false")
+    //                           .c_str());
+    //             } else if ("WORKSFMT" == hlo.m_name) {
+    //                 sprintf(buf,
+    //                         HLO_READ_VAR_REPLY_TEMPLATE,
+    //                         "worksfmt",
+    //                         "OK",
+    //                         VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
+    //                         vscp_convertToBase64(m_bDebug ? "true" : "false")
+    //                           .c_str());
+    //             } else if ("PATH-CONFIG" == hlo.m_name) {
+    //                 sprintf(buf,
+    //                         HLO_READ_VAR_REPLY_TEMPLATE,
+    //                         "path-config",
+    //                         "OK",
+    //                         VSCP_REMOTE_VARIABLE_CODE_STRING,
+    //                         vscp_convertToBase64(m_pathConfig.c_str()).c_str());
+    //             } else if ("FILTER" == hlo.m_name) {
+    //                 std::string str, filter;
+    //                 vscp_writeFilterToString(filter, &m_vscpfilterTx);
+    //                 vscp_writeMaskToString(str, &m_vscpfilterTx);
+    //                 filter += str;
+    //                 sprintf(buf,
+    //                         HLO_READ_VAR_REPLY_TEMPLATE,
+    //                         "filter",
+    //                         "OK",
+    //                         VSCP_REMOTE_VARIABLE_CODE_FILTER,
+    //                         vscp_convertToBase64(filter.c_str()).c_str());
+    //             } else {
+    //                 sprintf(
+    //                   buf,
+    //                   HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+    //                   hlo.m_name.c_str(),
+    //                   ERR_VARIABLE_UNKNOWN,
+    //                   vscp_convertToBase64(std::string("Unknown variable"))
+    //                     .c_str());
+    //             }
+    //         } else {
+    //             // Reads not allowed
+    //             sprintf(
+    //                   buf,
+    //                   HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+    //                   hlo.m_name.c_str(),
+    //                   ERR_VARIABLE_PERMISSION,
+    //                   vscp_convertToBase64(std::string("Not allowed to read variable"))
+    //                     .c_str());
+    //         }
+    //         break;
 
-        case HLO_OP_WRITE_VAR:
-            if (m_bWrite) {
-                if ("DEBUG" == hlo.m_name) {
-                    std::string str = hlo.m_value;
-                    vscp_makeUpper(str);
-                    if (std::string::npos != str.find("TRUE")) {
-                        m_bDebug = true;
-                        sprintf(
-                          buf,
-                          HLO_READ_VAR_REPLY_TEMPLATE,
-                          "debug",
-                          "OK",
-                          VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
-                          vscp_convertToBase64(m_bDebug ? "true" : "false")
-                            .c_str());
-                    } else if (std::string::npos != str.find("FALSE")) {
-                        m_bDebug = false;
-                        sprintf(
-                          buf,
-                          HLO_READ_VAR_REPLY_TEMPLATE,
-                          "debug",
-                          "OK",
-                          VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
-                          vscp_convertToBase64(m_bDebug ? "true" : "false")
-                            .c_str());
-                    } else {
-                        // Invalid value
-                        sprintf(buf,
-                                HLO_READ_VAR_ERR_REPLY_TEMPLATE,
-                                "debug",
-                                ERR_VARIABLE_VALUE,
-                                vscp_convertToBase64("Invalid value").c_str());
-                    }
-                } else if ("OVERWRITE" == hlo.m_name) {
+    //     case HLO_OP_WRITE_VAR:
+    //         if (m_bWrite) {
+    //             if ("DEBUG" == hlo.m_name) {
+    //                 std::string str = hlo.m_value;
+    //                 vscp_makeUpper(str);
+    //                 if (std::string::npos != str.find("TRUE")) {
+    //                     m_bDebug = true;
+    //                     sprintf(
+    //                       buf,
+    //                       HLO_READ_VAR_REPLY_TEMPLATE,
+    //                       "debug",
+    //                       "OK",
+    //                       VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
+    //                       vscp_convertToBase64(m_bDebug ? "true" : "false")
+    //                         .c_str());
+    //                 } else if (std::string::npos != str.find("FALSE")) {
+    //                     m_bDebug = false;
+    //                     sprintf(
+    //                       buf,
+    //                       HLO_READ_VAR_REPLY_TEMPLATE,
+    //                       "debug",
+    //                       "OK",
+    //                       VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
+    //                       vscp_convertToBase64(m_bDebug ? "true" : "false")
+    //                         .c_str());
+    //                 } else {
+    //                     // Invalid value
+    //                     sprintf(buf,
+    //                             HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+    //                             "debug",
+    //                             ERR_VARIABLE_VALUE,
+    //                             vscp_convertToBase64("Invalid value").c_str());
+    //                 }
+    //             } else if ("OVERWRITE" == hlo.m_name) {
 
-                    std::string str = hlo.m_value;
-                    vscp_makeUpper(str);
-                    if (std::string::npos != str.find("TRUE")) {
-                        m_bOverWrite = true;
-                        sprintf(
-                          buf,
-                          HLO_READ_VAR_REPLY_TEMPLATE,
-                          "overwrite",
-                          "OK",
-                          VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
-                          vscp_convertToBase64(m_bOverWrite ? "true" : "false")
-                            .c_str());
-                    } else if (std::string::npos != str.find("FALSE")) {
-                        m_bOverWrite = false;
-                        sprintf(
-                          buf,
-                          HLO_READ_VAR_REPLY_TEMPLATE,
-                          "overwrite",
-                          "OK",
-                          VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
-                          vscp_convertToBase64(m_bOverWrite ? "true" : "false")
-                            .c_str());
-                    } else {
-                        // Invalid value
-                        sprintf(buf,
-                                HLO_READ_VAR_ERR_REPLY_TEMPLATE,
-                                "overwrite",
-                                ERR_VARIABLE_VALUE,
-                                vscp_convertToBase64("Invalid value").c_str());
-                    }
-                } else if ("WORKSFMT" == hlo.m_name) {
-                    std::string str = hlo.m_value;
-                    vscp_makeUpper(str);
-                    if (std::string::npos != str.find("TRUE")) {
-                        m_bWorksFmt = true;
-                        sprintf(
-                          buf,
-                          HLO_READ_VAR_REPLY_TEMPLATE,
-                          "worksfmt",
-                          "OK",
-                          VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
-                          vscp_convertToBase64(m_bWorksFmt ? "true" : "false")
-                            .c_str());
-                    } else if (std::string::npos != str.find("FALSE")) {
-                        m_bWorksFmt = false;
-                        sprintf(
-                          buf,
-                          HLO_READ_VAR_REPLY_TEMPLATE,
-                          "worksfmt",
-                          "OK",
-                          VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
-                          vscp_convertToBase64(m_bWorksFmt ? "true" : "false")
-                            .c_str());
-                    } else {
-                        // Invalid value
-                        sprintf(buf,
-                                HLO_READ_VAR_ERR_REPLY_TEMPLATE,
-                                "overwrite",
-                                ERR_VARIABLE_VALUE,
-                                vscp_convertToBase64("Invalid value").c_str());
-                    }
-                } else if ("PATH-CONFIG" == hlo.m_name) {
-                    if (VSCP_REMOTE_VARIABLE_CODE_STRING == hlo.m_varType) {
-                        if (vscp_fileExists(hlo.m_value)) {
-                            m_pathConfig = hlo.m_value;
-                            sprintf(buf,
-                                    HLO_READ_VAR_REPLY_TEMPLATE,
-                                    "path-config",
-                                    "OK",
-                                    VSCP_REMOTE_VARIABLE_CODE_STRING,
-                                    vscp_convertToBase64(m_pathConfig.c_str())
-                                      .c_str());
-                        } else {
-                            sprintf(buf,
-                                    HLO_READ_VAR_ERR_REPLY_TEMPLATE,
-                                    "path-config",
-                                    VSCP_ERROR_WRITE_ERROR,
-                                    vscp_convertToBase64(
-                                      "Invalid path (existence/permissions)")
-                                      .c_str());
-                        }
-                    } else {
-                        // Error
-                        sprintf(buf,
-                                HLO_READ_VAR_ERR_REPLY_TEMPLATE,
-                                "path-config",
-                                ERR_VARIABLE_WRONG_TYPE,
-                                vscp_convertToBase64(
-                                  "Invalid variable type -  Should be string")
-                                  .c_str());
-                    }
-                } else if ("FILTER" == hlo.m_name) {
-                    if (VSCP_REMOTE_VARIABLE_CODE_FILTER == hlo.m_varType) {
-                        if (vscp_readFilterMaskFromString(&m_vscpfilterTx,
-                                                          hlo.m_value)) {
-                            std::string str, filter;
-                            vscp_writeFilterToString(filter, &m_vscpfilterTx);
-                            vscp_writeMaskToString(str, &m_vscpfilterTx);
-                            filter += str;
-                            sprintf(
-                              buf,
-                              HLO_READ_VAR_REPLY_TEMPLATE,
-                              "filter",
-                              "OK",
-                              VSCP_REMOTE_VARIABLE_CODE_FILTER,
-                              vscp_convertToBase64(filter.c_str()).c_str());
-                        } else {
-                            sprintf(
-                              buf,
-                              HLO_READ_VAR_ERR_REPLY_TEMPLATE,
-                              "filter",
-                              VSCP_ERROR_WRITE_ERROR,
-                              vscp_convertToBase64("Invalid filter").c_str());
-                        }
-                    } else {
-                        // Error
-                        sprintf(buf,
-                                HLO_READ_VAR_ERR_REPLY_TEMPLATE,
-                                "filter",
-                                ERR_VARIABLE_WRONG_TYPE,
-                                vscp_convertToBase64(
-                                  "Invalid variable type -  Should be filter")
-                                  .c_str());
-                    }
-                } else {
-                    sprintf(
-                      buf,
-                      HLO_READ_VAR_ERR_REPLY_TEMPLATE,
-                      hlo.m_name.c_str(),
-                      ERR_VARIABLE_UNKNOWN,
-                      vscp_convertToBase64(std::string("Unknown variable"))
-                        .c_str());
-                }
-            } else {
-                // Writes not allowed
-                sprintf(
-                      buf,
-                      HLO_READ_VAR_ERR_REPLY_TEMPLATE,
-                      hlo.m_name.c_str(),
-                      ERR_VARIABLE_READ_ONLY,
-                      vscp_convertToBase64(std::string("Not allowed to write variable"))
-                        .c_str());
-            }
-            break;
+    //                 std::string str = hlo.m_value;
+    //                 vscp_makeUpper(str);
+    //                 if (std::string::npos != str.find("TRUE")) {
+    //                     m_bOverWrite = true;
+    //                     sprintf(
+    //                       buf,
+    //                       HLO_READ_VAR_REPLY_TEMPLATE,
+    //                       "overwrite",
+    //                       "OK",
+    //                       VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
+    //                       vscp_convertToBase64(m_bOverWrite ? "true" : "false")
+    //                         .c_str());
+    //                 } else if (std::string::npos != str.find("FALSE")) {
+    //                     m_bOverWrite = false;
+    //                     sprintf(
+    //                       buf,
+    //                       HLO_READ_VAR_REPLY_TEMPLATE,
+    //                       "overwrite",
+    //                       "OK",
+    //                       VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
+    //                       vscp_convertToBase64(m_bOverWrite ? "true" : "false")
+    //                         .c_str());
+    //                 } else {
+    //                     // Invalid value
+    //                     sprintf(buf,
+    //                             HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+    //                             "overwrite",
+    //                             ERR_VARIABLE_VALUE,
+    //                             vscp_convertToBase64("Invalid value").c_str());
+    //                 }
+    //             } else if ("WORKSFMT" == hlo.m_name) {
+    //                 std::string str = hlo.m_value;
+    //                 vscp_makeUpper(str);
+    //                 if (std::string::npos != str.find("TRUE")) {
+    //                     m_bWorksFmt = true;
+    //                     sprintf(
+    //                       buf,
+    //                       HLO_READ_VAR_REPLY_TEMPLATE,
+    //                       "worksfmt",
+    //                       "OK",
+    //                       VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
+    //                       vscp_convertToBase64(m_bWorksFmt ? "true" : "false")
+    //                         .c_str());
+    //                 } else if (std::string::npos != str.find("FALSE")) {
+    //                     m_bWorksFmt = false;
+    //                     sprintf(
+    //                       buf,
+    //                       HLO_READ_VAR_REPLY_TEMPLATE,
+    //                       "worksfmt",
+    //                       "OK",
+    //                       VSCP_REMOTE_VARIABLE_CODE_BOOLEAN,
+    //                       vscp_convertToBase64(m_bWorksFmt ? "true" : "false")
+    //                         .c_str());
+    //                 } else {
+    //                     // Invalid value
+    //                     sprintf(buf,
+    //                             HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+    //                             "overwrite",
+    //                             ERR_VARIABLE_VALUE,
+    //                             vscp_convertToBase64("Invalid value").c_str());
+    //                 }
+    //             } else if ("PATH-CONFIG" == hlo.m_name) {
+    //                 if (VSCP_REMOTE_VARIABLE_CODE_STRING == hlo.m_varType) {
+    //                     if (vscp_fileExists(hlo.m_value)) {
+    //                         m_pathConfig = hlo.m_value;
+    //                         sprintf(buf,
+    //                                 HLO_READ_VAR_REPLY_TEMPLATE,
+    //                                 "path-config",
+    //                                 "OK",
+    //                                 VSCP_REMOTE_VARIABLE_CODE_STRING,
+    //                                 vscp_convertToBase64(m_pathConfig.c_str())
+    //                                   .c_str());
+    //                     } else {
+    //                         sprintf(buf,
+    //                                 HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+    //                                 "path-config",
+    //                                 VSCP_ERROR_WRITE_ERROR,
+    //                                 vscp_convertToBase64(
+    //                                   "Invalid path (existence/permissions)")
+    //                                   .c_str());
+    //                     }
+    //                 } else {
+    //                     // Error
+    //                     sprintf(buf,
+    //                             HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+    //                             "path-config",
+    //                             ERR_VARIABLE_WRONG_TYPE,
+    //                             vscp_convertToBase64(
+    //                               "Invalid variable type -  Should be string")
+    //                               .c_str());
+    //                 }
+    //             } else if ("FILTER" == hlo.m_name) {
+    //                 if (VSCP_REMOTE_VARIABLE_CODE_FILTER == hlo.m_varType) {
+    //                     if (vscp_readFilterMaskFromString(&m_vscpfilterTx,
+    //                                                       hlo.m_value)) {
+    //                         std::string str, filter;
+    //                         vscp_writeFilterToString(filter, &m_vscpfilterTx);
+    //                         vscp_writeMaskToString(str, &m_vscpfilterTx);
+    //                         filter += str;
+    //                         sprintf(
+    //                           buf,
+    //                           HLO_READ_VAR_REPLY_TEMPLATE,
+    //                           "filter",
+    //                           "OK",
+    //                           VSCP_REMOTE_VARIABLE_CODE_FILTER,
+    //                           vscp_convertToBase64(filter.c_str()).c_str());
+    //                     } else {
+    //                         sprintf(
+    //                           buf,
+    //                           HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+    //                           "filter",
+    //                           VSCP_ERROR_WRITE_ERROR,
+    //                           vscp_convertToBase64("Invalid filter").c_str());
+    //                     }
+    //                 } else {
+    //                     // Error
+    //                     sprintf(buf,
+    //                             HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+    //                             "filter",
+    //                             ERR_VARIABLE_WRONG_TYPE,
+    //                             vscp_convertToBase64(
+    //                               "Invalid variable type -  Should be filter")
+    //                               .c_str());
+    //                 }
+    //             } else {
+    //                 sprintf(
+    //                   buf,
+    //                   HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+    //                   hlo.m_name.c_str(),
+    //                   ERR_VARIABLE_UNKNOWN,
+    //                   vscp_convertToBase64(std::string("Unknown variable"))
+    //                     .c_str());
+    //             }
+    //         } else {
+    //             // Writes not allowed
+    //             sprintf(
+    //                   buf,
+    //                   HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+    //                   hlo.m_name.c_str(),
+    //                   ERR_VARIABLE_READ_ONLY,
+    //                   vscp_convertToBase64(std::string("Not allowed to write variable"))
+    //                     .c_str());
+    //         }
+    //         break;
 
-        case HLO_OP_SAVE:
-            if (m_bDebug) {
-                syslog(LOG_ERR,
-                       "[vscpl2drv-logger] HLO_OP_SAVE - Saving "
-                       "configuration.");
-            }
-            doSaveConfig();
-            break;
+    //     case HLO_OP_SAVE:
+    //         if (m_bDebug) {
+    //             syslog(LOG_ERR,
+    //                    "[vscpl2drv-logger] HLO_OP_SAVE - Saving "
+    //                    "configuration.");
+    //         }
+    //         doSaveConfig();
+    //         break;
 
-        case HLO_OP_LOAD:
-            syslog(LOG_ERR,
-                   "[vscpl2drv-logger] HLO_OP_LOAD - Loading "
-                   "configuration.");
-            doLoadConfig();
-            break;
+    //     case HLO_OP_LOAD:
+    //         syslog(LOG_ERR,
+    //                "[vscpl2drv-logger] HLO_OP_LOAD - Loading "
+    //                "configuration.");
+    //         doLoadConfig();
+    //         break;
 
-        case LOCAL_HLO_CMD_LOG_OPEN:
-            if (m_bDebug) {
-                syslog(LOG_ERR,
-                       "[vscpl2drv-logger] HLO-CMD OPEN - Opening logfile "
-                       "[%s][%s] .",
-                       m_pathLogfile.c_str(),
-                       (m_logStream.is_open() ? "open" : "closed"));
+    //     case LOCAL_HLO_CMD_LOG_OPEN:
+    //         if (m_bDebug) {
+    //             syslog(LOG_ERR,
+    //                    "[vscpl2drv-logger] HLO-CMD OPEN - Opening logfile "
+    //                    "[%s][%s] .",
+    //                    m_pathLogfile.c_str(),
+    //                    (m_logStream.is_open() ? "open" : "closed"));
 
-                if (!m_logStream.is_open()) {
-                    if (!openLogFile()) {
-                        syslog(LOG_ERR,
-                               "[vscpl2drv-logger] HLO-CMD OPEN - Failed to "
-                               "open logfile [%s].",
-                               m_pathLogfile.c_str());
-                    }
-                }
-                break;
+    //             if (!m_logStream.is_open()) {
+    //                 if (!openLogFile()) {
+    //                     syslog(LOG_ERR,
+    //                            "[vscpl2drv-logger] HLO-CMD OPEN - Failed to "
+    //                            "open logfile [%s].",
+    //                            m_pathLogfile.c_str());
+    //                 }
+    //             }
+    //             break;
 
-                case LOCAL_HLO_CMD_LOG_CLOSE:
-                    if (m_bDebug) {
-                        syslog(LOG_ERR,
-                               "[vscpl2drv-logger] HLO-CMD CLOSE - Closing "
-                               "logfile [%s][%s] .",
-                               m_pathLogfile.c_str(),
-                               (m_logStream.is_open() ? "open" : "closed"));
-                    }
-                    if (m_logStream.is_open()) {
-                        m_logStream.close();
-                    }
-                    break;
+    //             case LOCAL_HLO_CMD_LOG_CLOSE:
+    //                 if (m_bDebug) {
+    //                     syslog(LOG_ERR,
+    //                            "[vscpl2drv-logger] HLO-CMD CLOSE - Closing "
+    //                            "logfile [%s][%s] .",
+    //                            m_pathLogfile.c_str(),
+    //                            (m_logStream.is_open() ? "open" : "closed"));
+    //                 }
+    //                 if (m_logStream.is_open()) {
+    //                     m_logStream.close();
+    //                 }
+    //                 break;
 
-                default:
-                    // This command is not understood
-                    sprintf(
-                      buf,
-                      HLO_READ_VAR_ERR_REPLY_TEMPLATE,
-                      hlo.m_name.c_str(),
-                      ERR_VARIABLE_UNKNOWN,
-                      vscp_convertToBase64(std::string("Unknown variable"))
-                        .c_str());
-                    break;
-            };
-    }
+    //             default:
+    //                 // This command is not understood
+    //                 sprintf(
+    //                   buf,
+    //                   HLO_READ_VAR_ERR_REPLY_TEMPLATE,
+    //                   hlo.m_name.c_str(),
+    //                   ERR_VARIABLE_UNKNOWN,
+    //                   vscp_convertToBase64(std::string("Unknown variable"))
+    //                     .c_str());
+    //                 break;
+    //         };
+    // }
 
-    memset(ex.data, 0, sizeof(ex.data));
-    ex.sizeData = strlen(buf);
-    memcpy(ex.data, buf, ex.sizeData);
+    // memset(ex.data, 0, sizeof(ex.data));
+    // ex.sizeData = strlen(buf);
+    // memcpy(ex.data, buf, ex.sizeData);
 
-    // Put event in receive queue
-    return eventExToReceiveQueue(ex);
+    // // Put event in receive queue
+    // return eventExToReceiveQueue(ex);
+    return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // readEncryptionKey
 //
 
-size_t
-CVSCPLog::readEncryptionKey(void)
-{
-    size_t keySize = 0;
-    std::string line;
-    if (m_pathKey.size()) {
-        std::string line;
-        std::ifstream keyfile(m_pathKey);
-        if (keyfile.is_open()) {
-            getline(keyfile, line);
-            vscp_trim(line);
-            keySize = vscp_hexStr2ByteArray(m_key, 32, line.c_str());
-            keyfile.close();
-        } else {
-            syslog(LOG_ERR, "[vscpl2drv-logger] Failed to get encryption key.");
-        }
-    }
+// size_t
+// CVSCPLog::readEncryptionKey(void)
+// {
+//     size_t keySize = 0;
+//     std::string line;
+//     if (m_pathKey.size()) {
+//         std::string line;
+//         std::ifstream keyfile(m_pathKey);
+//         if (keyfile.is_open()) {
+//             getline(keyfile, line);
+//             vscp_trim(line);
+//             keySize = vscp_hexStr2ByteArray(m_key, 32, line.c_str());
+//             keyfile.close();
+//         } else {
+//             syslog(LOG_ERR, "[vscpl2drv-logger] Failed to get encryption key.");
+//         }
+//     }
 
-    return keySize;
-}
+//     return keySize;
+// }
 
 ///////////////////////////////////////////////////////////////////////////////
 // eventExToReceiveQueue
@@ -1039,18 +1103,18 @@ CVSCPLog::openLogFile(void)
     try {
         if (m_bOverWrite) {
 
-            m_logStream.open(m_pathLogfile, std::ios::out | std::ios::trunc);
+            m_logStream.open(m_pathLogFile, std::ios::out | std::ios::trunc);
             if (!m_logStream.is_open()) {
                 syslog(LOG_ERR,
                        "[vscpl2drv-logger] Failed to open log file [%s].",
-                       m_pathLogfile.c_str());
+                       m_pathLogFile.c_str());
                 return false;
             }
 
             if (m_bDebug) {
                 syslog(LOG_DEBUG,
                        "Successfully opened logfile [%s]",
-                       m_pathLogfile.c_str());
+                       m_pathLogFile.c_str());
             }
 
             // Write XML start data
@@ -1065,18 +1129,18 @@ CVSCPLog::openLogFile(void)
 
         } else {
 
-            m_logStream.open(m_pathLogfile, std::ios::out | std::ios::app);
+            m_logStream.open(m_pathLogFile, std::ios::out | std::ios::app);
             if (!m_logStream.is_open()) {
                 syslog(LOG_ERR,
                        "[vscpl2drv-logger] Failed to open log file [%s].",
-                       m_pathLogfile.c_str());
+                       m_pathLogFile.c_str());
                 return false;
             }
 
             if (m_bDebug) {
                 syslog(LOG_DEBUG,
                        "Successfully opened logfile [%s]",
-                       m_pathLogfile.c_str());
+                       m_pathLogFile.c_str());
             }
         }
     } catch (...) {
