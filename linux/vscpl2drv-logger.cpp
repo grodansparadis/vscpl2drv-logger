@@ -39,7 +39,7 @@ void _init() __attribute__((constructor));
 void _fini() __attribute__((destructor));
 
 // This map holds driver handles/objects
-static std::map<long, CVSCPLog *> g_ifMap;
+static std::map<long, CLog *> g_ifMap;
 
 // Mutex for the map object
 static pthread_mutex_t g_mapMutex;
@@ -63,11 +63,11 @@ void _fini() {
 
   LOCK_MUTEX(g_mapMutex);
 
-  for (std::map<long, CVSCPLog *>::iterator it = g_ifMap.begin();
+  for (std::map<long, CLog *>::iterator it = g_ifMap.begin();
        it != g_ifMap.end(); ++it) {
     // std::cout << it->first << " => " << it->second << '\n';
 
-    CVSCPLog *pif = it->second;
+    CLog *pif = it->second;
     if (NULL != pif) {
       delete pif;
       pif = NULL;
@@ -84,8 +84,8 @@ void _fini() {
 // addDriverObject
 //
 
-long addDriverObject(CVSCPLog *pif) {
-  std::map<long, CVSCPLog *>::iterator it;
+long addDriverObject(CLog *pif) {
+  std::map<long, CLog *>::iterator it;
   long h = 0;
 
   LOCK_MUTEX(g_mapMutex);
@@ -109,8 +109,8 @@ long addDriverObject(CVSCPLog *pif) {
 // getDriverObject
 //
 
-CVSCPLog *getDriverObject(long h) {
-  std::map<long, CVSCPLog *>::iterator it;
+CLog *getDriverObject(long h) {
+  std::map<long, CLog *>::iterator it;
   long idx = h - 1681;
 
   // Check if valid handle
@@ -130,7 +130,7 @@ CVSCPLog *getDriverObject(long h) {
 //
 
 void removeDriverObject(long h) {
-  std::map<long, CVSCPLog *>::iterator it;
+  std::map<long, CLog *>::iterator it;
   long idx = h - 1681;
 
   // Check if valid handle
@@ -140,7 +140,7 @@ void removeDriverObject(long h) {
   LOCK_MUTEX(g_mapMutex);
   it = g_ifMap.find(idx);
   if (it != g_ifMap.end()) {
-    CVSCPLog *pObj = it->second;
+    CLog *pObj = it->second;
     if (NULL != pObj) {
       delete pObj;
       pObj = NULL;
@@ -161,7 +161,7 @@ void removeDriverObject(long h) {
 extern "C" long VSCPOpen(const char *pPathConfig, const char *pguid) {
   long h = 0;
 
-  CVSCPLog *pdrvObj = new CVSCPLog();
+  CLog *pdrvObj = new CLog();
   if (NULL != pdrvObj) {
 
     std::string cfg(pPathConfig);
@@ -186,7 +186,7 @@ extern "C" long VSCPOpen(const char *pPathConfig, const char *pguid) {
 //
 
 extern "C" int VSCPClose(long handle) {
-  CVSCPLog *pdrvObj = getDriverObject(handle);
+  CLog *pdrvObj = getDriverObject(handle);
   if (NULL == pdrvObj)
     return 0;
   pdrvObj->close();
@@ -200,9 +200,10 @@ extern "C" int VSCPClose(long handle) {
 
 extern "C" int VSCPWrite(long handle, const vscpEvent *pEvent,
                          unsigned long timeout) {
-  CVSCPLog *pdrvObj = getDriverObject(handle);
-  if (NULL == pdrvObj)
+  CLog *pdrvObj = getDriverObject(handle);
+  if (NULL == pdrvObj) {
     return CANAL_ERROR_MEMORY;
+  }
   pdrvObj->addEvent2SendQueue(pEvent);
 
   return CANAL_ERROR_SUCCESS;
@@ -217,7 +218,7 @@ extern "C" int VSCPRead(long handle, vscpEvent *pEvent, unsigned long timeout) {
   if (NULL == pEvent)
     return CANAL_ERROR_PARAMETER;
 
-  CVSCPLog *pdrvObj = getDriverObject(handle);
+  CLog *pdrvObj = getDriverObject(handle);
   if (NULL == pdrvObj)
     return CANAL_ERROR_MEMORY;
 

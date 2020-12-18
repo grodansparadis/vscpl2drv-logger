@@ -45,17 +45,16 @@ using namespace kainjow::mustache;
 #define VSCP_LOG_LIST_MAX_MSG 2048
 
 // Forward declarations
-class CLogWrkThreadObj;
 class CHLO;
 
-class CVSCPLog
+class CLog
 {
   public:
     /// Constructor
-    CVSCPLog();
+    CLog();
 
     /// Destructor
-    virtual ~CVSCPLog();
+    virtual ~CLog();
 
     /*!
       Filter message
@@ -185,9 +184,6 @@ class CVSCPLog
     /// Save on VSCP Works format if enabled
     bool m_bWorksFmt;
 
-    // Config file path
-    std::string m_pathConfig;
-
     /// Unique GUID for this driver
     cguid m_guid;
 
@@ -199,9 +195,6 @@ class CVSCPLog
 
     /// Pointer to worker thread
     pthread_t m_pWrkThread;
-
-    // Worker object
-    CLogWrkThreadObj* m_pWorkObj;
 
     /// Filter
     vscpEventFilter m_vscpfilterTx;
@@ -222,24 +215,6 @@ class CVSCPLog
     pthread_mutex_t m_mutexReceiveQueue;
 };
 
-///////////////////////////////////////////////////////////////////////////////
-//				Worker Tread
-///////////////////////////////////////////////////////////////////////////////
 
-class CLogWrkThreadObj
-{
-  public:
-    /// Constructor
-    CLogWrkThreadObj();
-
-    /// Destructor
-    ~CLogWrkThreadObj();
-
-    /// VSCP server interface
-    VscpRemoteTcpIf m_srv;
-
-    /// Log object
-    CVSCPLog* m_pLog;
-};
 
 #endif // !defined(VSCPLOG_H__6F5CD90E_ACF7_459A_9ACB_849A57595639__INCLUDED_)

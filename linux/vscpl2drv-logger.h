@@ -54,7 +54,7 @@
     @return handle or 0 for error
 */
 long
-addDriverObject(CVSCPLog *pif);
+addDriverObject(CLog *pif);
 
 /*!
     Get a driver object from its handle
@@ -63,7 +63,7 @@ addDriverObject(CVSCPLog *pif);
     @return pointer to object or NULL if invalid
             handle.
 */
-CVSCPLog *
+CLog *
 getDriverObject(long handle);
 
 /*!

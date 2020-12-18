@@ -1,4 +1,4 @@
-// Log.cpp: implementation of the CVSCPLog class.
+// Log.cpp: implementation of the CLog class.
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -74,10 +74,10 @@ threadWorker(void* pData);
 //////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////
-// CVSCPLog
+// CLog
 //
 
-CVSCPLog::CVSCPLog()
+CLog::CLog()
 {
     m_bQuit      = false;
     m_bWrite     = false;
@@ -95,10 +95,10 @@ CVSCPLog::CVSCPLog()
 }
 
 //////////////////////////////////////////////////////////////////////
-// ~CVSCPLog
+// ~CLog
 //
 
-CVSCPLog::~CVSCPLog()
+CLog::~CLog()
 {
 
     close();
@@ -138,7 +138,7 @@ CVSCPLog::~CVSCPLog()
 // void
 // startSetupParser(void* data, const char* name, const char** attr)
 // {
-//     CVSCPLog* pLog = (CVSCPLog*)data;
+//     CLog* pLog = (CLog*)data;
 //     if (NULL == pLog)
 //         return;
 
@@ -280,19 +280,19 @@ CVSCPLog::~CVSCPLog()
 //
 
 bool
-CVSCPLog::open(std::string& pathcfg, cguid& guid)
+CLog::open(std::string& pathcfg, cguid& guid)
 {
     // Set GUID
     m_guid = guid;
 
     // Save config path
-    m_pathConfig = pathcfg;
+    m_path = pathcfg;
 
     // Read configuration file
     if (!doLoadConfig()) {
         syslog(LOG_ERR,
                "[vscpl2drv-logger] Failed to load configuration file [%s]",
-               m_pathConfig.c_str());
+               m_path.c_str());
     }
 
     // Not allowed to have append and VSCP Works format
@@ -304,17 +304,8 @@ CVSCPLog::open(std::string& pathcfg, cguid& guid)
     }
 
     // start the worker thread
-    m_pWorkObj = new CLogWrkThreadObj();
-    if (NULL != m_pWorkObj) {
-
-        m_pWorkObj->m_pLog = this;
-
-        if (pthread_create(&m_pWrkThread, NULL, threadWorker, m_pWorkObj)) {
-            syslog(LOG_CRIT, "Unable to start logger driver worker thread.");
-            return false;
-        }
-    } else {
-        syslog(LOG_CRIT, "Unable to allocate thread object.");
+    if (pthread_create(&m_pWrkThread, NULL, threadWorker, this)) {
+        syslog(LOG_CRIT, "Unable to start logger driver worker thread.");
         return false;
     }
 
@@ -326,7 +317,7 @@ CVSCPLog::open(std::string& pathcfg, cguid& guid)
 //
 
 void
-CVSCPLog::close(void)
+CLog::close(void)
 {
     if (m_logStream.is_open() && m_bWorksFmt) {
         m_logStream.write("</vscprxdata>\n", strlen("</vscprxdata>\n"));
@@ -348,7 +339,7 @@ CVSCPLog::close(void)
 //
 
 bool
-CVSCPLog::doFilter(vscpEvent* pEvent)
+CLog::doFilter(vscpEvent* pEvent)
 {
     return true;
 }
@@ -358,7 +349,7 @@ CVSCPLog::doFilter(vscpEvent* pEvent)
 //
 
 void
-CVSCPLog::setFilter(vscpEvent* pFilter)
+CLog::setFilter(vscpEvent* pFilter)
 {
     return;
 }
@@ -368,7 +359,7 @@ CVSCPLog::setFilter(vscpEvent* pFilter)
 //
 
 void
-CVSCPLog::setMask(vscpEvent* pMask)
+CLog::setMask(vscpEvent* pMask)
 {
     return;
 }
@@ -380,7 +371,7 @@ CVSCPLog::setMask(vscpEvent* pMask)
 //
 
 bool
-CVSCPLog::doLoadConfig(void)
+CLog::doLoadConfig(void)
 {
     // FILE* fp;
 
@@ -439,34 +430,34 @@ CVSCPLog::doLoadConfig(void)
     }
 
     try {
-        if (m_j_config.contains("write-enable") && m_j_config["write-enable"].is_boolean()) { 
-            m_bDebug = m_j_config["write-enable"].get<bool>();
+        if (m_j_config.contains("write") && m_j_config["write"].is_boolean()) { 
+            m_bWrite = m_j_config["write"].get<bool>();
         } else {
-            syslog(LOG_ERR, "ReadConfig: Failed to read 'write-debug'. Default will be used.");
+            syslog(LOG_ERR, "ReadConfig: Failed to read 'write'. Default will be used.");
         }
 
         if (m_bDebug) {
-            syslog(LOG_DEBUG, "ReadConfig: 'write-enable' set to %s", m_bWrite ? "true" : "false");
+            syslog(LOG_DEBUG, "ReadConfig: 'write' set to %s", m_bWrite ? "true" : "false");
         }
     }
     catch (...) {
-        syslog(LOG_ERR, "ReadConfig: Failed to read 'write-enable'. Default will be used.");
+        syslog(LOG_ERR, "ReadConfig: Failed to read 'write'. Default will be used.");
     }
 
     try {
-        if (m_j_config.contains("path-config") && m_j_config["path-config"].is_string()) { 
-            m_pathConfig = m_j_config["path-config"].get<std::string>();
+        if (m_j_config.contains("path") && m_j_config["path"].is_string()) { 
+            m_pathLogFile = m_j_config["path"].get<std::string>();
         } else {
-            syslog(LOG_ERR, "ReadConfig: Failed to read 'path-config'. Must be set.");
+            syslog(LOG_ERR, "ReadConfig: Failed to read 'path'. Must be set.");
             return false;
         }
 
         if (m_bDebug) {
-            syslog(LOG_DEBUG, "ReadConfig: 'path-config' set to %s", m_pathConfig.c_str());
+            syslog(LOG_DEBUG, "ReadConfig: 'path' set to %s", m_pathLogFile.c_str());
         }
     }
     catch (...) {
-        syslog(LOG_ERR, "ReadConfig: Failed to read 'path-config'. Must be set.");
+        syslog(LOG_ERR, "ReadConfig: Failed to read 'path'. Must be set.");
         return false;
     }
 
@@ -497,7 +488,7 @@ CVSCPLog::doLoadConfig(void)
         }
     }
     catch (...) {
-        syslog(LOG_ERR, "ReadConfig: Failed to read 'enable-overwrite'. Default will be used.");
+        syslog(LOG_ERR, "ReadConfig: Failed to read 'worksfmt'. Default will be used.");
     }
 
     try {
@@ -507,6 +498,9 @@ CVSCPLog::doLoadConfig(void)
                 if (!vscp_readFilterFromString(&m_vscpfilterTx, str)) {
                     syslog(LOG_ERR, "ReadConfig: Failed to read 'filter' from string.");
                 }
+            }
+            else {
+                syslog(LOG_ERR, "ReadConfig: Failed to read 'filter' zero length.");
             }
         } else {
             syslog(LOG_ERR, "ReadConfig: Failed to read 'filter'.");
@@ -530,6 +524,9 @@ CVSCPLog::doLoadConfig(void)
                     syslog(LOG_ERR, "ReadConfig: Failed to read 'mask' from string.");
                 }
             }
+            else {
+                syslog(LOG_ERR, "ReadConfig: Failed to read 'mask' zero length.");
+            }
         } else {
             syslog(LOG_ERR, "ReadConfig: Failed to read 'mask'.");
         }
@@ -552,7 +549,7 @@ CVSCPLog::doLoadConfig(void)
 //
 
 bool
-CVSCPLog::doSaveConfig(void)
+CLog::doSaveConfig(void)
 {
     // std::string access;
     // std::string filter;
@@ -676,7 +673,7 @@ CVSCPLog::doSaveConfig(void)
 //
 
 bool
-CVSCPLog::parseHLO(uint16_t size, uint8_t* inbuf, CHLO* phlo)
+CLog::parseHLO(uint16_t size, uint8_t* inbuf, CHLO* phlo)
 {
     // uint8_t outbuf[VSCP_MAX_DATA];
 
@@ -735,7 +732,7 @@ CVSCPLog::parseHLO(uint16_t size, uint8_t* inbuf, CHLO* phlo)
 //
 
 bool
-CVSCPLog::handleHLO(vscpEvent* pEvent)
+CLog::handleHLO(vscpEvent* pEvent)
 {
     // char buf[512]; // Working buffer
     // vscpEventEx ex;
@@ -1092,7 +1089,7 @@ CVSCPLog::handleHLO(vscpEvent* pEvent)
 //
 
 // size_t
-// CVSCPLog::readEncryptionKey(void)
+// CLog::readEncryptionKey(void)
 // {
 //     size_t keySize = 0;
 //     std::string line;
@@ -1117,7 +1114,7 @@ CVSCPLog::handleHLO(vscpEvent* pEvent)
 //
 
 bool
-CVSCPLog::eventExToReceiveQueue(vscpEventEx& ex)
+CLog::eventExToReceiveQueue(vscpEventEx& ex)
 {
     vscpEvent* pev = new vscpEvent();
     if (!vscp_convertEventExToEvent(pev, &ex)) {
@@ -1142,12 +1139,22 @@ CVSCPLog::eventExToReceiveQueue(vscpEventEx& ex)
 //
 
 bool
-CVSCPLog::addEvent2SendQueue(const vscpEvent* pEvent)
+CLog::addEvent2SendQueue(const vscpEvent* pEvent)
 {
+    vscpEvent *pev = new vscpEvent;
+    if (NULL == pev) return false;
+
+    pev->pdata = NULL;
+    pev->sizeData = 0;
+
+    if (!vscp_copyEvent(pev, pEvent)) {
+        return false;
+    }
+
     pthread_mutex_lock(&m_mutexSendQueue);
-    m_sendList.push_back((vscpEvent*)pEvent);
-    sem_post(&m_semSendQueue);
+    m_sendList.push_back((vscpEvent*)pev);
     pthread_mutex_unlock(&m_mutexSendQueue);
+    sem_post(&m_semSendQueue);
     return true;
 }
 
@@ -1156,8 +1163,18 @@ CVSCPLog::addEvent2SendQueue(const vscpEvent* pEvent)
 //
 
 bool
-CVSCPLog::addEvent2ReceiveQueue(const vscpEvent* pEvent)
+CLog::addEvent2ReceiveQueue(const vscpEvent* pEvent)
 {
+    vscpEvent *pev = new vscpEvent;
+    if (NULL == pev) return false;
+
+    pev->pdata = NULL;
+    pev->sizeData = 0;
+
+    if (!vscp_copyEvent(pev, pEvent)) {
+        return false;
+    }
+
     pthread_mutex_lock(&m_mutexReceiveQueue);
     m_receiveList.push_back((vscpEvent*)pEvent);
     sem_post(&m_semReceiveQueue);
@@ -1170,7 +1187,7 @@ CVSCPLog::addEvent2ReceiveQueue(const vscpEvent* pEvent)
 //
 
 bool
-CVSCPLog::openLogFile(void)
+CLog::openLogFile(void)
 {
     try {
         if (m_bOverWrite) {
@@ -1228,7 +1245,7 @@ CVSCPLog::openLogFile(void)
 //
 
 bool
-CVSCPLog::writeEvent2Log(vscpEvent* pEvent)
+CLog::writeEvent2Log(vscpEvent* pEvent)
 {
     if (m_logStream.is_open()) {
         if (m_bWorksFmt) {
@@ -1336,17 +1353,6 @@ CVSCPLog::writeEvent2Log(vscpEvent* pEvent)
     return true;
 }
 
-//////////////////////////////////////////////////////////////////////
-//                           Workerthread
-//////////////////////////////////////////////////////////////////////
-
-CLogWrkThreadObj::CLogWrkThreadObj()
-{
-    m_pLog = NULL;
-}
-
-CLogWrkThreadObj::~CLogWrkThreadObj() {}
-
 ///////////////////////////////////////////////////////////////////////////////
 // 								Worker thread
 ///////////////////////////////////////////////////////////////////////////////
@@ -1354,42 +1360,49 @@ CLogWrkThreadObj::~CLogWrkThreadObj() {}
 void*
 threadWorker(void* pData)
 {
-    CLogWrkThreadObj* pObj = (CLogWrkThreadObj*)pData;
-    if (NULL == pObj) {
+    CLog* pLog = (CLog*)pData;
+    if (NULL == pLog) {
         syslog(LOG_ERR,
                "[vscpl2drv-logger] No thread object supplied to worker thread. "
                "Aborting!");
         return NULL;
     }
 
-    // Check pointers
-    if (NULL == pObj->m_pLog) {
-        syslog(LOG_ERR,
-               "[vscpl2drv-logger] No valid logger object suppied to worker "
-               "thread. Aborting!");
-        return NULL;
-    }
-
     // Open the file
-    if (!pObj->m_pLog->openLogFile()) {
+    if (!pLog->openLogFile()) {
         syslog(LOG_ERR, "[vscpl2drv-logger] Failed to open log file. Aborting");
         return NULL;
     }
 
-    while (!pObj->m_pLog->m_bQuit) {
+    while (!pLog->m_bQuit) {
 
         // Wait for events
-        if ((-1 == vscp_sem_wait(&pObj->m_pLog->m_semSendQueue, 500)) &&
-            errno == ETIMEDOUT) {
-            continue;
+        int rv;
+        if (-1 == (rv = vscp_sem_wait(&pLog->m_semSendQueue, 500))) {
+            if (ETIMEDOUT == errno) {
+                continue;
+            } else if (EINTR == errno) {
+                syslog(LOG_ERR,
+                       "[vscpl2drv-logger] Interrupted by a signal handler");
+                continue;
+            } else if (EINVAL == errno) {
+                syslog(LOG_ERR,
+                       "[vscpl2drv-logger] Invalid semaphore (timout)");
+                break;
+            } else if (EAGAIN == errno) {
+                syslog(LOG_ERR, "[vscpl2drv-logger] Blocking error");
+                break;
+            } else {
+                syslog(LOG_ERR, "[vscpl2drv-logger] Unknown error");
+                break;
+            }
         }
 
-        if (pObj->m_pLog->m_sendList.size()) {
-
-            pthread_mutex_lock(&pObj->m_pLog->m_mutexSendQueue);
-            vscpEvent* pEvent = pObj->m_pLog->m_sendList.front();
-            pObj->m_pLog->m_sendList.pop_front();
-            pthread_mutex_unlock(&pObj->m_pLog->m_mutexSendQueue);
+        if (pLog->m_sendList.size()) {
+            pthread_mutex_lock(&pLog->m_mutexSendQueue);
+            vscpEvent* pEvent = pLog->m_sendList.front();
+            pLog->m_sendList.pop_front();
+            pthread_mutex_unlock(&pLog->m_mutexSendQueue);
 
             if (NULL == pEvent) {
                 continue;
@@ -1398,22 +1411,19 @@ threadWorker(void* pData)
             // Only HLO object event is of interst to us
             if ((VSCP_CLASS2_HLO == pEvent->vscp_class) &&
                 (VSCP2_TYPE_HLO_COMMAND == pEvent->vscp_type) &&
-                vscp_isSameGUID(pObj->m_pLog->m_guid.getGUID(), pEvent->GUID)) {
-                pObj->m_pLog->handleHLO(pEvent);
+                vscp_isSameGUID(pLog->m_guid.getGUID(), pEvent->GUID)) {
+                pLog->handleHLO(pEvent);
                 // Fall through and log event...
             }
 
-            pObj->m_pLog->writeEvent2Log(pEvent);
+            pLog->writeEvent2Log(pEvent);
 
-            vscp_deleteEvent(pEvent);
+            vscp_deleteEvent_v2(&pEvent);
             pEvent = NULL;
 
-        } // Event received
+        }   // Event received
 
-    } // Receive loop
-
-    // Close the channel
-    pObj->m_srv.doCmdClose();
+    }   // Receive loop
 
     return NULL;
 }
