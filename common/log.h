@@ -44,6 +44,9 @@ using namespace kainjow::mustache;
 
 #define VSCP_LOG_LIST_MAX_MSG 2048
 
+// Log file formats
+enum log_file_format {logFmtString = 0, logFmtXml, logFmtJson};
+
 // Forward declarations
 class CHLO;
 
@@ -114,21 +117,13 @@ class CLog
     */
     bool addEvent2ReceiveQueue(const vscpEvent* pEvent);
 
-    /*!
-      Parse HLO
-      @param size Size of HLO object 0-511 bytes
-      @param buf Pointer to buf containing HLO
-      @param phlo Pointer to HLO that will get parsed data
-      @return true on successfull parsing, false otherwise
-    */
-    bool parseHLO(uint16_t size, uint8_t* inbuf, CHLO* phlo);
 
     /*!
       Handle HLO commands sent to this driver
       @param pEvent HLO event
       @return true on success, false on failure
     */
-    bool handleHLO(vscpEvent* pEvent);
+    bool handleHLO(vscpEvent* pEvent);  
 
     /*!
       Put event on receive queue and signal
@@ -136,7 +131,7 @@ class CLog
       @param ex Event to send
       @return true on success, false on failure
     */
-    bool eventExToReceiveQueue(vscpEventEx& ex);
+    bool eventExToReceiveQueue(const vscpEventEx& ex);
 
     /*!
       Load configuration
@@ -159,7 +154,7 @@ class CLog
       Read encryption key
       @return key size or zero on failure.
     */
-    //size_t readEncryptionKey(void);
+    size_t readEncryptionKey(const std::string& path);
 
   public:
 
@@ -168,9 +163,6 @@ class CLog
 
     /// Run flag
     bool m_bQuit;
-
-    /// Path to configuration file
-    std::string m_path;
 
     /// True enables debug output to syslog
     bool m_bDebug;
@@ -181,8 +173,8 @@ class CLog
     /// Rewrite the log file when the driver starts if enabled
     bool m_bOverWrite;
 
-    /// Save on VSCP Works format if enabled
-    bool m_bWorksFmt;
+    /// Log file format (0=string, 1=xml, 2=json)
+    log_file_format m_logFmt;
 
     /// Unique GUID for this driver
     cguid m_guid;
@@ -190,8 +182,23 @@ class CLog
     /// Path to logfile
     std::string m_pathLogFile;
 
+    /// Path to the configuration file
+    std::string m_pathConfigFile;
+
     /// The log stream
     std::ofstream m_logStream;
+
+    /*! 
+      Key to encryption token
+      empty for no encryption.
+    */
+    std::string m_pathKey;
+
+    /*!
+      Encryption key
+      If set used to decrypt/encrypt HLO events
+    */
+    uint8_t m_key[32];
 
     /// Pointer to worker thread
     pthread_t m_pWrkThread;

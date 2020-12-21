@@ -3,7 +3,7 @@
     "write" : false,
     "path" : "/tmp/vscplogger.log",
     "overwrite" : false,
-    "worksfmt" : true, 
+    "logfmt" : 2, 
     "filter" : "0,0x0000,0x0000,00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00",
     "mask" : "0,0x0000,0x0000,00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00" 
 }

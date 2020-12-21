@@ -6,78 +6,137 @@
 - **Driver Linux**: vscpl2drv-logger.so
 - **Driver Windows**: vscpl2drv-logger.dll
 
-vscpd level II driver for diagnostic logging. It makes it possible to log VSCP events to a file. Two formats of the log file is supported. Either a standard log file with a standard text string for each event on each line or loggings can be written on XML format. The advantage ofthe later is that it can be read by VSCP works and further analyzed there. Several drivers can be loaded logging data to different output files and using different filter/masks.
+VSCP level II driver for diagnostic logging. It makes it possible to log VSCP events from a source to a file. Three formats of the log file is supported. Either a standard text string i loged for for each event or logging entries can be logged on XML or JSON format. The advantage of the later is that it can be read by VSCP works and further analyzed there. Several drivers can be used to write logging data to different output files and using different filter/masks for complex logging.
 
 ## Configuring the driver
 
-A VSCP level II driver have access to the tcp/ip interface of the machine is is installed on and fron that host it get unique credentials to allow it to log in to the tcp/ip interface. The driver can use this as a method to initially fetch configuration parameters. The link is  also used to as pass other data such as events to/from the server.
+### VSCP daemon configuration
 
-The configuration string for vscpl2drv-logger (set in */etc/vscp/vscpd.conf*) have the following format
+The driver is enables int the VSCP daemon configuration file as all other drivers. The configuration looks like this
+
+```json
+"level2" : [
+    {
+        "enable" : true,
+        "name" : "Logger",
+        "path-driver" : "/var/lib/vscp/drivers/level2/vscpl2drv-logger.so",
+        "path-config" : "/var/lib/vscp/vscpl2drv-logger.json",
+        "guid" : "FF:FF:FF:FF:FF:FF:FF:F5:02:00:00:00:00:00:00:01",
+
+        "mqtt" : {
+            "host" : "127.0.0.1",
+            "port" : 1883,
+            "user" : "vscp",
+            "password": "secret",
+            "clientid" : "mosq-vscp-logger-000001",
+            "format" : "json",
+            "qos" : 0,
+            "bcleansession" : false,
+            "bretain" : false,
+            "keepalive" : 60,
+            "reconnect-delay" : 10,
+            "reconnect-delay-max" : 100,
+            "reconnect-exponential-backoff" : false,
+            "cafile" : "",
+            "capath" : "",
+            "certfile" : "",
+            "keyfile" : "",
+            "pwkeyfile" : "",
+            "subscribe" : [
+                "vscp/#"
+            ],
+            "publish" : [
+                
+            ]
+        }
+    }
+]
+```
+
+- **enable** should be set to *true* to make the VSCP daemon load the driver. Set to *false* to disable.
+- **name** should be a system unique name you give your driver. 
+- **path-driver** Is the path to where the driver is installed. Standard location is */var/lib/vscp/drivers/level2/vscpl2drv-logger.so*
+- **path-config** Is the path to the driver configuration file. A good place to put this file is in */var/lib/vscp* or for higher security */etc/vscp*. Se below for more information.
+
+The *mqtt* section is optional and the main MQTT settings for the VSCP daemon will be used for all entries that is not present. The subscribe topic is however probably something that is set to a different value than for the general settings as this is the topic subscribed to to get logging entries.
+
+### Driver configuration
+
+The driver configuration looks like this.
+
+```json
+{
+    "debug" : true,
+    "write" : false,
+    "path" : "/tmp/vscplogger.log",
+    "overwrite" : false,
+    "format" : 2, 
+    "filter" : "0,0x0000,0x0000,00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00",
+    "mask" : "0,0x0000,0x0000,00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00" 
+}
+```
+
+ - **debug** will write out extra debug information to syslog. Enable by setting to *true* if you experience problems.
+ - **write** enables configuration write functionality if set to *true*. If enables remember that the configuration file must be placed at a location that is writable by the VSCP daemon.
+ - **path** is the path to the file where the logging data will be written.
+ - **overwrite** set to *true* to overwrite the data in the log file onm every restart. If set to false data will be appended to the log file.
+ - **format** Can be set to zero for string log format, 1 for XML log format and 2 for JSON log format. 
+ - **filter**/**mask** can be used to filter the steam of events. Both are **priority, class, type, guid**. Default is to log all events.
+
+## Install the driver
+
+Download the latest release from [https://github.com/grodansparadis/vscpl2drv-logger/releases](https://github.com/grodansparadis/vscpl2drv-logger/releases). Do
 
 ```bash
-path;rewrite;vscpworksfmt;filter;mask
+sudo apt install ../vscpl2drv-logger_x.x.x.deb
 ```
+where x.x.x is the version of the driver.
 
-* **path** - The absolute or relative path including the file name to the file that log data should be written to. Mandatory.
-* **rewrite** - Set to 'true' to create a new file or rewrite data over an old file with new data. Set to 'false' to append data to an existing file (create it if it's not available). Defaults to 'false'.
-* **filter** - A Standard VSCP filter in string from 'priority,class,type,GUID'. Example: '1,0x0000,0x0006,ff:ff:ff:ff:ff:ff:ff:01:00:00:00:00:00:00:00:00'. Defaults to an all zero filter.
-* **mask** - Standard VSCP mask in string form 'priority,class,type,GUID'. Example: 1,0x0000,0x0006,ff:ff:ff:ff:ff:ff:ff:01:00:00:00:00:00:00:00:00. Defaults to an all zero mask.
-
-The configuration string is the first configuration data that is read. The driver will, after it is read, ask the server for driver specific configuration data. This data is fetched with the same pattern for all drivers. Variables are formed by the driver name + some driver specific variable name. If this variable exist and contains data this will be used as configuration for the driver.
-
-For the vscpl2drv-logger the following configuration variables are defined
-
-| Variable name | Type | Description |
-| ------------- | :--: | ----------- |
-| **_path** | string | Path to the logfile. |
-| **_rewrite** | bool | Set to “true” to rewrite the file each time the driver is started. Set to “false” to append to file. |
-| **_vscpworksfmt** | bool | If “true” VSCP works XML format will be used for the log file. This means that the file will be possible to read and further analyzed by VSCP Works. If “false” a standard text based format will be used. |
-|**_filter** | string | Standard VSCP filter in string from. 1,0x0000,0x0006,ff:ff:ff:ff:ff:ff:ff:01:00:00:00:00:00:00:00:00 as priority,class,type,GUID |
-| **_mask** | string | Standard VSCP mask in string form. 1,0x0000,0x0006,ff:ff:ff:ff:ff:ff:ff:01:00:00:00:00:00:00:00:00 as priority,class,type,GUID |
-
-### Example of vscpd.conf entry for the logger driver.
-
-```xml
-<driver enable="true" >
-    <name>log1</name>
-    <path>/usr/local/lib/vscpl2_loggerdrv.so</path>
-    <config>/tmp/vscp_level2.log</config>
-    <guid>00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00</guid>
-</driver>
-```
-I this case the driver will fetch configuration data from the server from variables *log1_path, log1_rewrite, log1_vscpworksfmt, log1_filter and  log1_mask*
+The driver will be installed into */var/lib/vscp/drivers/level2*. A sample configuration file will be written to */var/lib/vscp*.
 
 ## Build the driver
 
-To build the driver you follow the same procedure as with all autoconf based builds
+Clone the repository with 
+
+```bash
+git clone https://github.com/grodansparadis/vscpl2drv-logger.git
+```
+
+or download one of the release archives from [https://github.com/grodansparadis/vscpl2drv-logger/releases](https://github.com/grodansparadis/vscpl2drv-logger/releases) and unpack.
+
+
+To build the driver you follow the same procedure as with all autoconf based builds. Enter the source folder and do
 
 ```bash
 ./configure
 make
-make install
+sudo make install
 ```
 
-The driver will be installed into */usr/local/lib*. Note that the debian package will install to */usr/lib*.
+The driver will be installed into */var/lib/vscp/drivers/level2*. A sample configuration file will be written to */var/lib/vscp*.
 
-## Build a debian package
-Use the supplied script *build_debian_package.sh*. The script will automatically build a debian package. You find the package files under */tmp/_BUILD_*
+## HLO configuration
 
----
+This driver can be will later be able configured using High Level Object configuration. 
+
+## VSCP
 
 There are many Level I drivers available in VSCP & Friends framework that can be used with both VSCP Works and the VSCP Daemon and added to that Level II and Level III drivers that can be used with the VSCP Daemon.
+
+You find a list of driver [here](https://docs.vscp.org/).
+
+If you want to build your own driver, information on how to do so can be found here
 
 Level I drivers is documented [here](https://grodansparadis.gitbooks.io/the-vscp-daemon/level_i_drivers.html).
 
 Level II drivers is documented [here](https://grodansparadis.gitbooks.io/the-vscp-daemon/level_ii_drivers.html)
 
-Level III drivers is documented [here](https://grodansparadis.gitbooks.io/the-vscp-daemon/level_iii_drivers.html)
-
 
 The VSCP project homepage is here <https://www.vscp.org>.
 
-The [manual](https://grodansparadis.gitbooks.io/the-vscp-daemon) for vscpd contains full documentation. Other documentation can be found here <https://grodansparadis.gitbooks.io>.
+The [manual](https://docs.vscp.org/#vscpd) for vscpd contains full documentation. Other documentation can be found [here](https://docs.vscp.org/).
 
-The vscpd source code may be downloaded from <https://github.com/grodansparadis/vscp>. Source code for other system components of VSCP & Friends are here <https://github.com/grodansparadis>
+The vscpd source code may be downloaded from [https://github.com/grodansparadis/vscp](https://github.com/grodansparadis/vscp). Source code for other system components of VSCP & Friends are here [https://github.com/grodansparadis](https://github.com/grodansparadis)
 
-# COPYRIGHT
+## COPYRIGHT
 Copyright (C) 2000-2020 Ake Hedman, Grodans Paradis AB - MIT license.
