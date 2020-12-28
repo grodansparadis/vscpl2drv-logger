@@ -499,20 +499,19 @@ CLog::handleHLO(vscpEvent* pEvent)
         }
     }
 
-
     json j_rply;
 
     // Prepare reply
     ex.obid      = 0;
     ex.head      = 0;
     ex.timestamp = vscp_makeTimeStamp();
-    vscp_setEventExToNow(&ex); // Set time to current time
+    vscp_setEventExToNow(&ex);  // Set time to current time
     ex.vscp_class = VSCP_CLASS2_HLO;
     ex.vscp_type  = VSCP2_TYPE_HLO_RESPONSE;
     m_guid.writeGUID(ex.GUID);
     memcpy(ex.data, pEvent->pdata, 16);
     
-    if ( "noop" == hlo_op ) {
+    if ("noop" == hlo_op) {
         
         // Send positive response
         j_rply["op"] = "noop";
