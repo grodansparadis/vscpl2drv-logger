@@ -11,11 +11,9 @@ mqtt.password = "secret";
 // GUID is normally the same as set in VSCP daemon config file for 
 // the vscpl2drv-logger driver. Use {{guid}} for this or set
 // it explicitly.
-mqtt.publish = "vscp/{{guid}}";
-mqtt.subscribe = "vscp/{{guid}}/#";
+mqtt.publish = "vscp/FF:FF:FF:FF:FF:FF:FF:F5:05:00:00:00:00:00:00:00";
+mqtt.subscribe = "vscp/FF:FF:FF:FF:FF:FF:FF:F5:05:00:00:00:00:00:00:00/#";
 
 mqtt.timeout = 30;
 mqtt.keepalive = 60;
 mqtt.cleansession = true;
-mqtt.reconnect = false;
-mqtt.willmessage = "disconnected";

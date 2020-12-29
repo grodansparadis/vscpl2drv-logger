@@ -47,6 +47,7 @@
  */
 var vscp = vscp || {};
 
+
 /** VSCP classes
  * @enum {number}
  * @const
