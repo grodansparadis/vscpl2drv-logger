@@ -482,7 +482,7 @@ CLog::handleHLO(vscpEvent* pEvent)
     // Get op
     if (!j["op"].is_string()) {
         syslog(LOG_ERR,
-               "[vscpl2drv-logger] HLO parser: No operation specified.");
+               "[vscpl2drv-logger] HLO parser: No operation specified (not string).");
         return false;
     }
 
@@ -720,6 +720,18 @@ CLog::handleHLO(vscpEvent* pEvent)
             if (m_logStream.is_open()) {
                 m_logStream.close();
             }
+    } else if ( "start" == hlo_op ) {
+        // Start the worker thread
+        
+    } else if ( "stop" == hlo_op ) {
+        // Stop the worker thread
+
+    }  else if ( "restart" == hlo_op ) {
+        // Restart the worker thread
+
+    }
+    else {
+        // Unknow command
     }
 
     std::string rply = j_rply.dump();
@@ -1029,12 +1041,10 @@ CLog::writeEvent2Log(vscpEvent* pEvent)
                 m_logStream << j.dump();
                 m_logStream << ",";
                 m_logStream.flush();
-            }
-            else {
+            } else {
                 syslog(LOG_ERR, "[vscpl2drv-logger] Failed to convert event to JSON.");
             }
-        }
-        else {
+        } else {
             syslog(LOG_ERR, "[vscpl2drv-logger] Invalid log format set.");
         }
     }
@@ -1064,7 +1074,6 @@ threadWorker(void* pData)
     }
 
     while (!pLog->m_bQuit) {
-
         // Wait for events
         int rv;
         if (-1 == (rv = vscp_sem_wait(&pLog->m_semSendQueue, 500))) {
@@ -1109,9 +1118,7 @@ threadWorker(void* pData)
 
             vscp_deleteEvent_v2(&pEvent);
             pEvent = NULL;
-
         }   // Event received
-
     }   // Receive loop
 
     return NULL;

@@ -105,7 +105,14 @@
 
     <div class="container">
       <h2>vscpl2drv-logger HLO</h2>
-      <form class="form-horizontal" id="frmSettings" action="fgffgfgf">
+      <form class="form-horizontal" id="frmSettings" action="">
+
+        <div class="form-group">
+          <b><label class="control-label col-sm-2 text-primary" for="guid">GUID for driver:</label></b>
+          <div class="col-sm-10">
+            <input type="text" class="form-control" id="frmSettingsDriverGuid" placeholder="Enter GUID" name="guid">
+          </div>
+        </div>
 
         <div class="form-group"> 
           <b><label class="control-label col-sm-2 text-primary" for="fmt">Options:</label></b>
@@ -146,6 +153,8 @@
         </div>        
         
         <div class="btn-group-justified">
+          <button type="button" class="btn btn-secondary" data-toggle="modal" id="btnNoop" onclick="doNOOP()">NOOP</button>
+          &nbsp;&nbsp;&nbsp;&nbsp;
           <button type="button" class="btn btn-success" data-toggle="modal" id="btnReadSettings" onclick="doReadSettings()">Read</button>
           <button type="button" class="btn btn-success" data-toggle="modal" id="btnWriteSettings" onclick="doWriteSettings()">Write</button>
           &nbsp;&nbsp;&nbsp;&nbsp;
@@ -175,6 +184,7 @@
     <!-- VSCP UX version -->    
     <script type="text/javascript" src="js/vscp.js"></script>
     <script type="text/javascript" src="js/vscp_class.js"></script>
+    <script type="text/javascript" src="js/vscp_type.js"></script>
     
     <!-- MQTT websocket support -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
@@ -188,8 +198,12 @@
         settings.path = "/tmp/vscpl2drv_logger.log";
         settings.filter = "0,0x0000,0x0000,00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00";
         settings.mask = "0,0x0000,0x0000,00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00";
+        // This is the GUID for the driver
+        settings.driver_guid = "FF:FF:FF:FF:FF:FF:FF:F5:02:00:00:00:00:00:00:01";
 
         //document.getElementById("frmSetting").onclick = function() {transferMQTTSettings()};
+
+        //alert(navigator.userAgent);
         
         // --------------------------------------------------------------------
         function transfer_settings() {
@@ -230,6 +244,8 @@
           // Mask
           $('#frmSettingsMask').prop('value', settings.mask);
 
+          // Driver GUID
+          $('#frmSettingsDriverGuid').prop('value', settings.driver_guid);
         };
 
         transfer_settings();
@@ -262,7 +278,6 @@
         // --------------------------------------------------------------------
         function doConnect() {
           // Create a client instance
-          //client = new Paho.MQTT.Client(mqtt.hostname, Number(mqtt.port), mqtt.clientid);
           console.log("Connecting to " + mqtt.host + ":" + mqtt.port + " - " + mqtt.clientid);
           mqtt.client = new Paho.MQTT.Client(mqtt.host, Number(mqtt.port), mqtt.clientid);
         
@@ -285,6 +300,58 @@
         // --------------------------------------------------------------------
         function doDisconnect() {
           mqtt.client.disconnect();
+        };
+
+        // --------------------------------------------------------------------
+        function doNOOP() {
+
+          if (!bConnected) {
+            alert("Must be connected to MQTT broker to send NOOP HLO command.");
+            return;
+          }
+
+          e = new Event();
+          
+          e.setDumbNode();  // We are a dumb node
+          e.vscpGuid = mqtt.ourguid;
+          e.vscpClass = vscp_class.VSCP_CLASS2_HLO;
+          e.vscpType = vscp_type.VSCP2_TYPE_HLO_COMMAND;
+
+          // Build the command
+          hlo = {};
+          hlo.op = "noop";
+          hlo.arg = [];
+          
+          // Set destination GUID
+          let GUID = $('#frmSettingsDriverGuid').val().split(":");
+          let i = 0;
+          GUID.forEach(item => e.vscpData[i++] = parseInt(item, 16));
+
+          // Set HLO type and encryption byte
+          e.vscpData[16] = hloDataCoding.VSCP_HLO_TYPE_JSON << 4 + hloEncryption.VSCP_HLO_ENCRYPTION_NONE;
+
+          // Encode HLO in BASE64
+          cmdobj = btoa(JSON.stringify(hlo));
+          
+          var key = CryptoJS.enc.Hex.parse("118936609611995527558842825295939984461619945582983118632182081617810553435620990616930024788597679705273571258581579903462073466509789082074820127722129686153760294141231208449441162740545275340109522272224485137416896122648620761496782965425126716708885036660376323772729833976739164684426895301380869961609075296289916833284295072665793438611150527545219776386070900159530214438516663444085776810");
+          //var iv = CryptoJS.enc.Hex.parse("101112131415161718191a1b1c1d1e1f");
+          var iv = CryptoJS.lib.WordArray.random(128/8);
+          console.log(key.toString());
+          var encrypted = CryptoJS.AES.encrypt("Hello world", key, {iv:iv});
+          console.log("key: " + encrypted.key.toString());
+          console.log(encrypted.ciphertext.toString());
+          var decrypted = CryptoJS.AES.decrypt(encrypted.toString(), key, {iv:iv});
+          console.log(decrypted.toString(CryptoJS.enc.Utf8));
+
+          let arr = cmdobj.split('');
+
+          e.vscpData = e.vscpData.concat(arr);
+
+          message = new Paho.MQTT.Message(JSON.stringify(e.toJSONObj()));
+          message.destinationName = mqtt.publish;
+          mqtt.client.send(message);
+
+          
         };
 
         // --------------------------------------------------------------------

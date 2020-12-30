@@ -42,16 +42,12 @@
                         Generated: 2020-12-14 13:36:12.195082
 */
 
-/** Namespace for all functionality of the VSCP provided libraries.
- * @namespace vscp
- */
-var vscp = vscp || {};
 
 /** VSCP class types
  * @enum {number}
  * @const
  */
-vscp.constants.types = {
+vscp_type = {
 
     VSCP_TYPE_UNDEFINED: 0,
 

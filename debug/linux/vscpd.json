@@ -69,7 +69,7 @@
                     "keyfile" : "",
                     "pwkeyfile" : "",
                     "subscribe" : [
-                        "ooo"
+                        "vscp/{{guid}}"
                     ],
                     "publish" : [
                         "vscp/{{guid}}/{{class}}/{{type}}/{{nodeid}}"

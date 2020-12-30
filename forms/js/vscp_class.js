@@ -42,17 +42,11 @@
                         Generated: 2020-12-14 13:36:10.584419
 */
 
-/** Namespace for all functionality of the VSCP provided libraries.
- * @namespace vscp
- */
-var vscp = vscp || {};
-
-
 /** VSCP classes
  * @enum {number}
  * @const
  */
-vscp.constants.classes = {
+vscp_class = {
 
     VSCP_CLASS1_PROTOCOL: 0,
     VSCP_CLASS1_ALARM: 1,
