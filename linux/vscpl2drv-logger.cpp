@@ -165,7 +165,7 @@ extern "C" long VSCPOpen(const char *pPathConfig, const char *pguid) {
   if (NULL != pdrvObj) {
 
     std::string cfg(pPathConfig);
-    cguid guid(pguid);
+    cguid guid((const uint8_t *)pguid);
 
     if (pdrvObj->open(cfg, guid)) {
 

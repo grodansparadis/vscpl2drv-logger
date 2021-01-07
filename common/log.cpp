@@ -35,8 +35,8 @@
 #include <unistd.h>
 
 //#include <expat.h>
+#include <vscpbase64.h>
 
-#include <vscp_aes.h>
 #include <hlo.h>
 #include <remotevariablecodes.h>
 #include <vscp_class.h>
@@ -428,8 +428,8 @@ CLog::handleHLO(vscpEvent* pEvent)
         return false;
     }
 
-    // GUID + type = 17 + dummy payload size=1
-    if (pEvent->sizeData < 18) {
+    // GUID + type = 17 + dummy payload size=10 {"op:":""}
+    if (pEvent->sizeData < 1(17+10) {
         syslog(LOG_ERR,
                "[vscpl2drv-logger] HLO parser: HLO buffer size is wrong.");
         return false;
@@ -448,8 +448,11 @@ CLog::handleHLO(vscpEvent* pEvent)
         return true;
     }
 
+    uint8_t pkt_type = (pEvent->pdata[16] >> 4) & 0x0f;
+    uint8_t pkt_encryption = pEvent->pdata[16] & 0x0f;
+
     // Check that type is JSON as we only accept JSON encoded HLO
-    if (((pEvent->pdata[16] >> 4) & 0x0f) != VSCP_HLO_TYPE_JSON) {
+    if (pkt_type != VSCP_HLO_TYPE_JSON) {
         syslog(LOG_ERR,
                "[vscpl2drv-logger] Only JSON formatted HLO understod.");
         return false;
@@ -457,23 +460,17 @@ CLog::handleHLO(vscpEvent* pEvent)
 
     // Parse HLO
     try {
-        std::string str((const char*)(pEvent->pdata + 17), pEvent->sizeData-17);
+        char buf[512];
+        memset(buf, 0, sizeof(buf));
+        size_t len;
+        vscp_base64_decode(pEvent->pdata + 17, pEvent->sizeData-17, buf, &len);
+        std::string str = std::string((const char *)buf);
         j = json::parse(str);
     }
     catch (...) {
         syslog(LOG_ERR,
                "[vscpl2drv-logger] HLO parser: Unable to parse JSON data.");
         return false;
-    }
-
-    // Decrypt if needed
-    if (m_pathKey.length()) {
-        vscp_decryptFrame(outbuf,
-                          pEvent->pdata + 16,
-                          pEvent->sizeData - 16,
-                          m_key,
-                          NULL,
-                          (pEvent->pdata[16] & 0x0f));
     }
 
     std::string hlo_op;
@@ -737,13 +734,14 @@ CLog::handleHLO(vscpEvent* pEvent)
     std::string rply = j_rply.dump();
 
     uint8_t iv[32];
-    getRandomIV(iv, 32);
-    size_t len = vscp_encryptFrame(outbuf,
-                                    (uint8_t *)rply.c_str(),
-                                    rply.length(),
-                                    m_key,
-                                    iv,
-                                    (pEvent->pdata[16] & 0x0f));
+    size_t len;
+    // getRandomIV(iv, 32);
+    // size_t len = vscp_encryptFrame(outbuf,
+    //                                 (uint8_t *)rply.c_str(),
+    //                                 rply.length(),
+    //                                 m_key,
+    //                                 iv,
+    //                                 (pEvent->pdata[16] & 0x0f));
 
     memset(ex.data, 0, sizeof(ex.data));
     ex.sizeData = len;
@@ -1109,10 +1107,10 @@ threadWorker(void* pData)
             // Only HLO object event is of interst to us
             if ((VSCP_CLASS2_HLO == pEvent->vscp_class) &&
                 (VSCP2_TYPE_HLO_COMMAND == pEvent->vscp_type) &&
-                vscp_isSameGUID(pLog->m_guid.getGUID(), pEvent->GUID)) {
-                pLog->handleHLO(pEvent);
-                // Fall through and log event...
-            }
+                vscp_isSameGUID(pLog->m_guid.getGUID(), pEvent->pdata)) {
+                    pLog->handleHLO(pEvent);
+                    // Fall through and log event...
+                }
 
             pLog->writeEvent2Log(pEvent);
 
