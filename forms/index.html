@@ -8,7 +8,7 @@
     
     <!-- Bootstrap -->
     <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.3/css/bootstrap.min.css">
-
+    
     <!-- Application settings -->
     <script type="text/javascript" src="js/settings.js"></script>
     
@@ -166,6 +166,18 @@
       </form>
     </div>
 
+    <br>
+
+    <!-- Response data -->
+    <div class="container">
+      <div id="rxtable"></div>
+    </div>
+    
+    <div class="container">
+      <hr>  
+      Copyright 2021 © Åke Hedman, Grodans Paradis AB  -- MIT License.
+    </div>
+
     <!--------------------------------------------------------------------------------------------------------------------->
 
 
@@ -174,9 +186,6 @@
 
     <!-- Bootstrap -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.3/js/bootstrap.min.js"></script>
-
-    <!-- crypto-js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/crypto-js.min.js" integrity="sha512-nOQuvD9nKirvxDdvQ9OMqe2dgapbPB7vYAMrzJihw5m+aNcf0dX53m6YxM4LgA9u8e9eg9QX+/+mPu8kCNpV2A==" crossorigin="anonymous"></script>
 
     <!-- mustache.js - https://github.com/janl/mustache.js/ -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mustache.js/4.1.0/mustache.min.js" integrity="sha512-HYiNpwSxYuji84SQbCU5m9kHEsRqwWypXgJMBtbRSumlx1iBB6QaxgEBZHSHEGM+fKyCX/3Kb5V5jeVXm0OglQ==" crossorigin="anonymous"></script>
@@ -194,11 +203,6 @@
 
     <script type="text/javascript">
 
-        // Encryption/decryption settings
-        var keySize = 256;
-        var ivSize = 128;
-        var iterations = 1000;
-
         var settings = {};
         settings.debug = false;
         settings.overwrite = true;
@@ -211,75 +215,9 @@
 
         //document.getElementById("frmSetting").onclick = function() {transferMQTTSettings()};
 
-        //alert(navigator.userAgent);
+        //alert(navigator.userAgent); 
+             
 
-        // --------------------------------------------------------------------
-        function encrypt (msg, pass) {
-          var salt = CryptoJS.lib.WordArray.random(128/8);          
-          // var key = CryptoJS.PBKDF2(pass, salt, {
-          //                             keySize: keySize/32,
-          //                             iterations: 1000
-          //                           });
-
-          var kkey = CryptoJS.enc.Hex.parse("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f");
-          var iiv = CryptoJS.enc.Hex.parse("101112131415161718191a1b1c1d1e1f");
-
-          console.log("key = ", kkey.toString());
-          console.log("iv = ", iiv.toString());
-          //var iv = CryptoJS.lib.WordArray.random(128/8);
-          
-          var encrypted = CryptoJS.AES.encrypt(msg, kkey, { 
-                                                iv: iiv, 
-                                                padding: CryptoJS.pad.Pkcs7,
-                                                mode: CryptoJS.mode.CBC   
-                                              });
-          console.log("encrypted = ", encrypted.toString());
-          
-          // salt, iv will be hex 32 in length
-          // append them to the ciphertext for use  in decryption
-          var transitmessage = salt.toString() + iiv.toString() + encrypted.toString();
-          console.log("encrypted str = ", encrypted.toString());
-
-          console.log(encryptMessage(kkey, hlo));
-
-          rv = [];
-          var tokens_salt = salt.toString().match(/../gi);
-          rv = tokens_salt.map(t => parseInt(t,16));
-          console.log("[salt] = ", salt,rv);
-
-          var tokens_iv = iiv.toString().match(/../gi);
-          rv = rv.concat(tokens_iv.map(t => parseInt(t,16)));
-          console.log("[iv] = ", rv);
-
-          //rv.encrypted = encrypted.toString();
-          var tokens_encrypted = encrypted.toString().match(/./gi);
-          rv = rv.concat(tokens_encrypted.map(t => t.charCodeAt(0)));
-          console.log("[encrypted] = ", rv);
-
-          return rv;
-        }
-
-        // --------------------------------------------------------------------
-        function decrypt (transitmessage, pass) {
-          var salt = CryptoJS.enc.Hex.parse(transitmessage.substr(0, 32));
-          var iv = CryptoJS.enc.Hex.parse(transitmessage.substr(32, 32))
-          var encrypted = transitmessage.substring(64);
-          
-          var key = CryptoJS.PBKDF2(pass, salt, {
-              keySize: keySize/32,
-              iterations: iterations
-            });
-
-          var decrypted = CryptoJS.AES.decrypt(encrypted, key, { 
-                                                iv: iv, 
-                                                padding: CryptoJS.pad.Pkcs7,
-                                                mode: CryptoJS.mode.CBC    
-                                              });
-          return decrypted;
-        }
-
-
-        
         // --------------------------------------------------------------------
         function transfer_settings() {
 
@@ -385,44 +323,84 @@
             return;
           }
 
-          e = new Event();
-          
+          // Get destination GUID
+          let GUID = $('#frmSettingsDriverGuid').val().split(":");
+
+          e = new Event();          
           e.setDumbNode();  // We are a dumb node
           e.vscpGuid = mqtt.ourguid;
           e.vscpClass = vscp_class.VSCP_CLASS2_HLO;
           e.vscpType = vscp_type.VSCP2_TYPE_HLO_COMMAND;
+
+          // Construct publish topic
+          var publish = Mustache.render(mqtt.publish, { "class": e.vscpClass, "type": e.vscpType } );
 
           // Build the command
           hlo = {};
           hlo.op = "noop";
           hlo.arg = [];
           
-          // Set destination GUID
-          let GUID = $('#frmSettingsDriverGuid').val().split(":");
+          // Set destination GUID          
           let i = 0;
           GUID.forEach(item => e.vscpData[i++] = parseInt(item, 16));
 
           // Set HLO type and encryption byte
-          e.vscpData[16] = (hloDataCoding.VSCP_HLO_TYPE_JSON << 4) + hloEncryption.VSCP_HLO_ENCRYPTION_AES256;
+          e.vscpData[16] = (hloDataCoding.VSCP_HLO_TYPE_JSON << 4) + hloEncryption.VSCP_HLO_ENCRYPTION_NONE;
 
           // Encode HLO in BASE64
-          let cmdobj = btoa(JSON.stringify(hlo));
+          //let cmdobj = btoa(JSON.stringify(hlo));
+          let cmdobj = JSON.stringify(hlo);
           let tokens_cmdobj = cmdobj.toString().match(/./gi);
           let arr = tokens_cmdobj.map(t => t.charCodeAt(0));
           e.vscpData = e.vscpData.concat(arr);
 
           message = new Paho.MQTT.Message(JSON.stringify(e.toJSONObj()));
-          var publish = Mustache.render(mqtt.publish, { "class": e.vscpClass, "type": e.vscpType } );
           message.destinationName = publish;
           mqtt.client.send(message);
-
           
         };
 
         // --------------------------------------------------------------------
         function doReadSettings() {
-          alert("Read Settings");
-          alert(mqtt.host);
+          if (!bConnected) {
+            alert("Must be connected to MQTT broker to use HLO read command.");
+            return;
+          }
+          console.log("Read settings....");
+          // Get destination GUID
+          let GUID = $('#frmSettingsDriverGuid').val().split(":");
+
+          e = new Event();          
+          e.setDumbNode();  // We are a dumb node
+          e.vscpGuid = mqtt.ourguid;
+          e.vscpClass = vscp_class.VSCP_CLASS2_HLO;
+          e.vscpType = vscp_type.VSCP2_TYPE_HLO_COMMAND;
+
+          // Construct publish topic
+          var publish = Mustache.render(mqtt.publish, { "class": e.vscpClass, "type": e.vscpType } );
+
+          // Build the command
+          hlo = {};
+          hlo.op = "readvar";
+          hlo.arg = "debug";
+          
+          // Set destination GUID          
+          let i = 0;
+          GUID.forEach(item => e.vscpData[i++] = parseInt(item, 16));
+
+          // Set HLO type and encryption byte
+          e.vscpData[16] = (hloDataCoding.VSCP_HLO_TYPE_JSON << 4) + hloEncryption.VSCP_HLO_ENCRYPTION_NONE;
+
+          // Encode HLO in BASE64
+          //let cmdobj = btoa(JSON.stringify(hlo));
+          let cmdobj = JSON.stringify(hlo);
+          let tokens_cmdobj = cmdobj.toString().match(/./gi);
+          let arr = tokens_cmdobj.map(t => t.charCodeAt(0));
+          e.vscpData = e.vscpData.concat(arr);
+
+          message = new Paho.MQTT.Message(JSON.stringify(e.toJSONObj()));
+          message.destinationName = publish;
+          mqtt.client.send(message);
         };
 
         // --------------------------------------------------------------------
@@ -449,6 +427,8 @@
             // message = new Paho.MQTT.Message("Hello");
             // message.destinationName = mqtt.publish;
             // mqtt.client.send(message);
+            let content = "<br>" + $('#rxtable').html();
+            $('#rxtable').html("Connected" + content );  
         }
 
         // --------------------------------------------------------------------
@@ -464,14 +444,48 @@
             if (responseObject.errorCode !== 0) {
                 console.log("onConnectionLost:"+responseObject.errorMessage);
             }
+
             $("#status_text").text("Disconnected");
+
+            let content = "<br>" + $('#rxtable').html();
+            $('#rxtable').html("Disconnected" + content );
         }
         
         // --------------------------------------------------------------------
         // called when a message arrives
         function onMessageArrived(message) {
-            console.log("onMessageArrived:"+message.payloadString);
+
+            // Get event
+            let e = JSON.parse(message.payloadString);
+
+            console.log(e.vscpClass);
+            console.log(e.vscpType);
+            
+            if ((vscp_class.VSCP_CLASS2_HLO  === e.vscpClass) && 
+                (vscp_type.VSCP2_TYPE_HLO_RESPONSE === e.vscpType)) {
+              
+                  // Get GUID
+              let guid = e.vscpData.slice(0,15);
+              
+              // Get encoding
+              let encoding = e.vscpData[16];
+
+              // Get response    
+              let hloRespone = JSON.parse(String.fromCharCode.apply(null, e.vscpData.slice(17)));
+              console.log(hloRespone);
+              if ("noop" === hloRespone.op) {
+                console.log("noop - response: rv=",hloRespone.rv);
+                $('#rxtable').html("noop: rv = " + hloRespone.rv + "<br>" + $('#rxtable').html() ); 
+              }
+              else if ("read" === hloRespone.op) {
+                console.log("noop - response: rv=",hloRespone.rv);
+                $('#rxtable').html("noop: rv = " + hloRespone.rv + "<br>" + $('#rxtable').html() ); 
+              }
+
+            }
+
         }
+
     </script>
     
 </body>

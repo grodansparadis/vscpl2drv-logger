@@ -429,7 +429,7 @@ CLog::handleHLO(vscpEvent* pEvent)
     }
 
     // GUID + type = 17 + dummy payload size=10 {"op:":""}
-    if (pEvent->sizeData < 1(17+10) {
+    if (pEvent->sizeData < (17+10)) {
         syslog(LOG_ERR,
                "[vscpl2drv-logger] HLO parser: HLO buffer size is wrong.");
         return false;
@@ -462,8 +462,9 @@ CLog::handleHLO(vscpEvent* pEvent)
     try {
         char buf[512];
         memset(buf, 0, sizeof(buf));
-        size_t len;
-        vscp_base64_decode(pEvent->pdata + 17, pEvent->sizeData-17, buf, &len);
+        //size_t len;
+        //vscp_base64_decode(pEvent->pdata + 17, pEvent->sizeData-17, buf, &len);
+        memcpy(buf, pEvent->pdata + 17, pEvent->sizeData-17);
         std::string str = std::string((const char *)buf);
         j = json::parse(str);
     }
@@ -487,8 +488,8 @@ CLog::handleHLO(vscpEvent* pEvent)
     vscp_trim(hlo_op);
     vscp_makeLower(hlo_op);
 
-    // Get arg(s)
-    if (!j["arg"].is_string()) {
+    // Get arg(s)  - empty list if no args
+    if (j["arg"].is_string()) {
         hlo_args.push_back(j["arg"]);
     } else if (!j["arg"].is_array()) {
         for (json::iterator it = j["arg"].begin(); it != j["arg"].end(); ++it) {
@@ -500,22 +501,19 @@ CLog::handleHLO(vscpEvent* pEvent)
 
     // Prepare reply
     ex.obid      = 0;
-    ex.head      = 0;
+    ex.head      = VSCP_HEADER16_DUMB;
     ex.timestamp = vscp_makeTimeStamp();
     vscp_setEventExToNow(&ex);  // Set time to current time
     ex.vscp_class = VSCP_CLASS2_HLO;
     ex.vscp_type  = VSCP2_TYPE_HLO_RESPONSE;
-    m_guid.writeGUID(ex.GUID);
-    memcpy(ex.data, pEvent->pdata, 16);
+    
     
     if ("noop" == hlo_op) {
-        
         // Send positive response
         j_rply["op"] = "noop";
         j_rply["rv"] = "ok";
 
     } else if ( "readvar" == hlo_op ) {
-
         if (!hlo_args.size()) {
             // Must be at least one argument
             // Send positive response
@@ -523,7 +521,6 @@ CLog::handleHLO(vscpEvent* pEvent)
             j_rply["rv"] = "error";
             j_rply["note"] = "radvar needs one argument. readvar 'name-of-var'";
         } else {
-
             std::string var_name = hlo_args.front();
             vscp_trim(var_name);
             vscp_makeLower(var_name);
@@ -560,7 +557,6 @@ CLog::handleHLO(vscpEvent* pEvent)
                 j_rply["arg"]["name"] = "filter";
                 j_rply["arg"]["type"] = VSCP_REMOTE_VARIABLE_CODE_STRING;
                 j_rply["arg"]["value"] = vscp_convertToBase64(str);
-
             } else if ("mask" == var_name) {                            
                 std::string str;
                 vscp_writeMaskToString(str, &m_vscpfilterTx);
@@ -733,28 +729,22 @@ CLog::handleHLO(vscpEvent* pEvent)
 
     std::string rply = j_rply.dump();
 
-    uint8_t iv[32];
-    size_t len;
-    // getRandomIV(iv, 32);
-    // size_t len = vscp_encryptFrame(outbuf,
-    //                                 (uint8_t *)rply.c_str(),
-    //                                 rply.length(),
-    //                                 m_key,
-    //                                 iv,
-    //                                 (pEvent->pdata[16] & 0x0f));
-
     memset(ex.data, 0, sizeof(ex.data));
-    ex.sizeData = len;
+    ex.sizeData = 17 + rply.length();
     if (ex.sizeData > (VSCP_LEVEL2_MAXDATA-17)) {
         syslog(LOG_ERR, "[vscpl2drv-logger] HLO: Reply data is larger than allowed maximum.");
         ex.sizeData = VSCP_LEVEL2_MAXDATA-17;
     }
 
+    // Write in GUID
+    m_guid.writeGUID(ex.GUID);
+    memcpy(ex.data, pEvent->GUID, 16);
+
     // Set type byte
     ex.data[16] = pEvent->pdata[16];
 
     // Copy in data
-    memcpy(ex.data+17, outbuf, ex.sizeData);
+    memcpy(ex.data+17, rply.c_str(), rply.length());
 
     // Put event in receive queue
     return eventExToReceiveQueue(ex);
