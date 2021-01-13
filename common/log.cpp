@@ -175,11 +175,12 @@ CLog::close(void)
     }
 
     // Do nothing if already terminated
-    if (m_bQuit)
+    if (m_bQuit) {
         return;
+    }
 
     m_bQuit = true; // terminate the thread
-    sleep(1);       // Give the thread some time to terminate
+    pthread_join(m_pWrkThread, NULL);
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -233,7 +234,8 @@ CLog::doLoadConfig(void)
     try {
         if (m_j_config.contains("debug") && m_j_config["debug"].is_boolean()) { 
             m_bDebug = m_j_config["debug"].get<bool>();
-        } else {
+        } 
+        else {
             syslog(LOG_ERR, "ReadConfig: Failed to read 'debug'. Default will be used.");
         }
 
@@ -248,7 +250,8 @@ CLog::doLoadConfig(void)
     try {
         if (m_j_config.contains("write") && m_j_config["write"].is_boolean()) { 
             m_bWrite = m_j_config["write"].get<bool>();
-        } else {
+        } 
+        else {
             syslog(LOG_ERR, "ReadConfig: Failed to read 'write'. Default will be used.");
         }
 
@@ -263,7 +266,8 @@ CLog::doLoadConfig(void)
     try {
         if (m_j_config.contains("path") && m_j_config["path"].is_string()) { 
             m_pathLogFile = m_j_config["path"].get<std::string>();
-        } else {
+        } 
+        else {
             syslog(LOG_ERR, "ReadConfig: Failed to read 'path'. Must be set.");
             return false;
         }
@@ -280,7 +284,8 @@ CLog::doLoadConfig(void)
     try {
         if (m_j_config.contains("overwrite") && m_j_config["overwrite"].is_boolean()) { 
             m_bOverWrite = m_j_config["overwrite"].get<bool>();
-        } else {
+        } 
+        else {
             syslog(LOG_ERR, "ReadConfig: Failed to read 'overwrite'. Default will be used.");
         }
 
@@ -312,7 +317,8 @@ CLog::doLoadConfig(void)
                     break;
             }
 
-        } else {
+        } 
+        else {
             syslog(LOG_ERR, "ReadConfig: Failed to read 'logfmt'. Default will be used.");
         }
 
@@ -335,7 +341,8 @@ CLog::doLoadConfig(void)
             else {
                 syslog(LOG_ERR, "ReadConfig: Failed to read 'filter' zero length.");
             }
-        } else {
+        } 
+        else {
             syslog(LOG_ERR, "ReadConfig: Failed to read 'filter'.");
         }
 
@@ -360,7 +367,8 @@ CLog::doLoadConfig(void)
             else {
                 syslog(LOG_ERR, "ReadConfig: Failed to read 'mask' zero length.");
             }
-        } else {
+        } 
+        else {
             syslog(LOG_ERR, "ReadConfig: Failed to read 'mask'.");
         }
 
@@ -419,7 +427,7 @@ bool
 CLog::handleHLO(vscpEvent* pEvent)
 {
     json j;
-    uint8_t outbuf[2048];  // Encryption/decryption buffer
+    //uint8_t outbuf[2048];  // Encryption/decryption buffer
     vscpEventEx ex;
 
     // Check pointers
@@ -491,7 +499,8 @@ CLog::handleHLO(vscpEvent* pEvent)
     // Get arg(s)  - empty list if no args
     if (j["arg"].is_string()) {
         hlo_args.push_back(j["arg"]);
-    } else if (!j["arg"].is_array()) {
+    } 
+    else if (j["arg"].is_array()) {
         for (json::iterator it = j["arg"].begin(); it != j["arg"].end(); ++it) {
             hlo_args.push_back(*it);
         }
@@ -507,224 +516,340 @@ CLog::handleHLO(vscpEvent* pEvent)
     ex.vscp_class = VSCP_CLASS2_HLO;
     ex.vscp_type  = VSCP2_TYPE_HLO_RESPONSE;
     
-    
+    // ------------------------------------------------------------------------
     if ("noop" == hlo_op) {
         // Send positive response
         j_rply["op"] = "noop";
-        j_rply["rv"] = "ok";
-
-    } else if ( "readvar" == hlo_op ) {
+        j_rply["rv"] = VSCP_ERROR_SUCCESS;
+    }
+    // ------------------------------------------------------------------------
+    else if ( "readvar" == hlo_op ) {
         if (!hlo_args.size()) {
             // Must be at least one argument
             // Send positive response
             j_rply["op"] = "readvar";
-            j_rply["rv"] = "error";
+            j_rply["rv"] = VSCP_ERROR_INVALID_SYNTAX;
             j_rply["note"] = "radvar needs one argument. readvar 'name-of-var'";
-        } else {
+        } 
+        else {
             std::string var_name = hlo_args.front();
             vscp_trim(var_name);
             vscp_makeLower(var_name);
 
+            j_rply["op"] = hlo_op;
+
             if ("debug" == var_name) {
-                j_rply["rv"] = "ok";
+                j_rply["rv"] = VSCP_ERROR_SUCCESS;
                 j_rply["arg"]["name"] = "debug";
                 j_rply["arg"]["type"] = VSCP_REMOTE_VARIABLE_CODE_BOOLEAN;
-                j_rply["arg"]["value"] = m_bDebug ? "true" : "false";
-            } else if ("write" == var_name) {
-                j_rply["rv"] = "ok";
+                j_rply["arg"]["value"] = m_bDebug ? true : false;
+                j_rply["arg"]["attr"] = PERMISSION_OTHER_READ | PERMISSION_OTHER_WRITE;
+            } 
+            else if ("write" == var_name) {
+                j_rply["rv"] = VSCP_ERROR_SUCCESS;
                 j_rply["arg"]["name"] = "write";
                 j_rply["arg"]["type"] = VSCP_REMOTE_VARIABLE_CODE_BOOLEAN;
-                j_rply["arg"]["value"] = m_bWrite ? "true" : "false";
-            } else if ("overwrite" == var_name) {
-                j_rply["rv"] = "ok";
+                j_rply["arg"]["value"] = m_bWrite ? true : false;
+                j_rply["arg"]["attr"] = PERMISSION_OTHER_READ;
+            } 
+            else if ("overwrite" == var_name) {
+                j_rply["rv"] = VSCP_ERROR_SUCCESS;
                 j_rply["arg"]["name"] = "overwrite";
                 j_rply["arg"]["type"] = VSCP_REMOTE_VARIABLE_CODE_BOOLEAN;
-                j_rply["arg"]["value"] = m_bOverWrite ? "true" : "false";
-            } else if ("logfmt" == var_name) {
-                j_rply["rv"] = "ok";
+                j_rply["arg"]["value"] = m_bOverWrite ? true : false;
+                j_rply["arg"]["attr"] = PERMISSION_OTHER_READ | PERMISSION_OTHER_WRITE;
+            } 
+            else if ("logfmt" == var_name) {
+                j_rply["rv"] = VSCP_ERROR_SUCCESS;
                 j_rply["arg"]["name"] = "logfmt";
                 j_rply["arg"]["type"] = VSCP_REMOTE_VARIABLE_CODE_UINT8;
-                j_rply["arg"]["value"] = vscp_str_format("%d", m_logFmt);
-            } else if ("path" == var_name) {
-                j_rply["rv"] = "ok";
+                j_rply["arg"]["value"] = m_logFmt;
+                j_rply["arg"]["attr"] = PERMISSION_OTHER_READ | PERMISSION_OTHER_WRITE;
+            } 
+            else if ("path" == var_name) {
+                j_rply["rv"] = VSCP_ERROR_SUCCESS;
                 j_rply["arg"]["name"] = "path";
                 j_rply["arg"]["type"] = VSCP_REMOTE_VARIABLE_CODE_STRING;
-                j_rply["arg"]["value"] = vscp_convertToBase64(m_pathConfigFile);
-            } else if ("filter" == var_name) {
+                j_rply["arg"]["value"] = vscp_convertToBase64(m_pathLogFile);
+                j_rply["arg"]["attr"] = PERMISSION_OTHER_READ | PERMISSION_OTHER_WRITE;
+            } 
+            else if ("filter" == var_name) {
                 std::string str;
                 vscp_writeFilterToString(str, &m_vscpfilterTx);
-                j_rply["rv"] = "ok";
+                j_rply["rv"] = VSCP_ERROR_SUCCESS;
                 j_rply["arg"]["name"] = "filter";
                 j_rply["arg"]["type"] = VSCP_REMOTE_VARIABLE_CODE_STRING;
                 j_rply["arg"]["value"] = vscp_convertToBase64(str);
-            } else if ("mask" == var_name) {                            
+                j_rply["arg"]["attr"] = PERMISSION_OTHER_READ | PERMISSION_OTHER_WRITE;
+            } 
+            else if ("mask" == var_name) {
                 std::string str;
                 vscp_writeMaskToString(str, &m_vscpfilterTx);
-                j_rply["rv"] = "ok";
+                j_rply["rv"] = VSCP_ERROR_SUCCESS;
                 j_rply["arg"]["name"] = "mask";
                 j_rply["arg"]["type"] = VSCP_REMOTE_VARIABLE_CODE_STRING;
                 j_rply["arg"]["value"] = vscp_convertToBase64(str);
-            } else {
+                j_rply["arg"]["attr"] = PERMISSION_OTHER_READ | PERMISSION_OTHER_WRITE;
+            } 
+            else {
                 // Unknown variable
                 j_rply["op"] = "readvar";
-                j_rply["rv"] = "error";
+                j_rply["rv"] = VSCP_ERROR_UNKNOWN_ITEM;
                 j_rply["note"] = "Unknown variable.";
             }
         }
-    } else if ( "writevar" == hlo_op ) {
+    }
+    // ------------------------------------------------------------------------
+    else if ( "writevar" == hlo_op ) {
 
         if (hlo_args.size() < 2) {
-            // Must be at least one argument
+            // Must be at least two arguments (name,value)
             // Send positive response
             j_rply["op"] = "writevar";
-            j_rply["rv"] = "error";
+            j_rply["rv"] = VSCP_ERROR_INVALID_SYNTAX;
             j_rply["note"] = "radvar needs two arguments. writevar 'name-of-var' 'value'";
-        } else if (!m_bWrite) {
+        } /* else if (!m_bWrite) {
+            // Must be write enabled
             j_rply["op"] = "writevar";
-            j_rply["rv"] = "error";
+            j_rply["rv"] = VSCP_ERROR_WRITE_ERROR;
             j_rply["note"] = "Write operations is disabled.";
-        } else {
-
+        } */ 
+        else {
+            // Get variable name
             std::string var_name = hlo_args.front();
             hlo_args.pop_front();
             vscp_trim(var_name);
             vscp_makeLower(var_name);
 
+            // Get variable value
             std::string var_value = hlo_args.front();
             hlo_args.pop_front();
             
             if ("debug" == var_name) {
                 if (std::string::npos != var_value.find("true")) {
                     m_bDebug = true;
-                } else {
+                } 
+                else {
                     m_bDebug = false;
                 }
-                j_rply["rv"] = "ok";
+                j_rply["op"] = "writevar";
+                j_rply["rv"] = VSCP_ERROR_SUCCESS;
                 j_rply["arg"]["name"] = "debug";
                 j_rply["arg"]["type"] = VSCP_REMOTE_VARIABLE_CODE_BOOLEAN;
-                j_rply["arg"]["value"] = m_bDebug ? "true" : "false";
-            } else if ("write" == var_name) {
+                j_rply["arg"]["value"] = m_bDebug ? true : false;
+            } 
+            else if ("write" == var_name) {
                 // 'write' is read only
-                j_rply["rv"] = "error";
+                j_rply["op"] = "writevar";
+                j_rply["rv"] = VSCP_ERROR_READ_ONLY;
                 j_rply["note"] = "The 'write' variable is read-only";
                 j_rply["arg"]["name"] = "write";
                 j_rply["arg"]["type"] = VSCP_REMOTE_VARIABLE_CODE_BOOLEAN;
-                j_rply["arg"]["value"] = m_bWrite ? "true" : "false";
-            } else if ("overwrite" == var_name) {
+                j_rply["arg"]["value"] = m_bWrite ? true : false;
+            } 
+            else if ("overwrite" == var_name) {
                 if (std::string::npos != var_value.find("true")) {
                     m_bOverWrite = true;
-                } else {
+                } 
+                else {
                     m_bOverWrite = false;
                 }
-                j_rply["rv"] = "OK";
+                j_rply["op"] = "writevar";
+                j_rply["rv"] = VSCP_ERROR_SUCCESS;
                 j_rply["arg"]["name"] = "overwrite";
                 j_rply["arg"]["type"] = VSCP_REMOTE_VARIABLE_CODE_BOOLEAN;
-                j_rply["arg"]["value"] = m_bOverWrite ? "true" : "false";
-            } else if ("logfmt" == var_name) {
-                j_rply["rv"] = "ok";
+                j_rply["arg"]["value"] = m_bOverWrite ? true : false;
+            } 
+            else if ("logfmt" == var_name) {
+                j_rply["rv"] = VSCP_ERROR_SUCCESS;
                 int fmt = vscp_readStringValue(var_value);
                 switch (fmt) {
                     case 0:
                         m_logFmt = logFmtString;
+                        j_rply["rv"] = VSCP_ERROR_SUCCESS;
                         break;
                     case 1:
                         m_logFmt = logFmtXml;
+                        j_rply["rv"] = VSCP_ERROR_SUCCESS;
                         break;
                     case 2:
                         m_logFmt = logFmtJson;
+                        j_rply["rv"] = VSCP_ERROR_SUCCESS;
                         break;
                     default:
-                        j_rply["rv"] = "error";
+                        j_rply["rv"] = VSCP_ERROR_INVALID_SYNTAX;
                         j_rply["note"] = "Invalid log format.";
                         break;
                 }
+                j_rply["op"] = "writevar";
                 j_rply["arg"]["name"] = "logfmt";
                 j_rply["arg"]["type"] = VSCP_REMOTE_VARIABLE_CODE_UINT8;
                 j_rply["arg"]["value"] = vscp_str_format("%d", m_logFmt);
-            } else if ("path" == var_name) {
-                m_pathConfigFile = var_value;
-                j_rply["rv"] = "OK";
+            } 
+            else if ("path" == var_name) {
+                vscp_base64_std_decode(var_value);
+                m_pathLogFile = var_value;
+                j_rply["op"] = "writevar";
+                j_rply["rv"] = VSCP_ERROR_SUCCESS;
                 j_rply["arg"]["name"] = "path";
                 j_rply["arg"]["type"] = VSCP_REMOTE_VARIABLE_CODE_STRING;
-                j_rply["arg"]["value"] = vscp_convertToBase64(m_pathConfigFile);
-            } else if ("filter" == var_name) {
+                j_rply["arg"]["value"] = vscp_convertToBase64(m_pathLogFile);
+            } 
+            else if ("filter" == var_name) {
                 std::string str;
+                vscp_base64_std_decode(var_value);
                 vscp_readFilterFromString(&m_vscpfilterTx, var_value);
                 vscp_writeFilterToString(str, &m_vscpfilterTx);
-                j_rply["rv"] = "OK";
+                j_rply["op"] = "writevar";
+                j_rply["rv"] = VSCP_ERROR_SUCCESS;
                 j_rply["arg"]["name"] = "filter";
                 j_rply["arg"]["type"] = VSCP_REMOTE_VARIABLE_CODE_STRING;
                 j_rply["arg"]["value"] = vscp_convertToBase64(str);
 
-            } else if ("mask" == var_name) {
+            } 
+            else if ("mask" == var_name) {
                 std::string str;
-                vscp_readFilterFromString(&m_vscpfilterTx, var_value);
-                vscp_writeFilterToString(str, &m_vscpfilterTx);
-                j_rply["rv"] = "OK";
+                vscp_base64_std_decode(var_value);
+                vscp_readMaskFromString(&m_vscpfilterTx, var_value);
+                vscp_writeMaskToString(str, &m_vscpfilterTx);
+                j_rply["op"] = "writevar";
+                j_rply["rv"] = VSCP_ERROR_SUCCESS;
                 j_rply["arg"]["name"] = "mask";
                 j_rply["arg"]["type"] = VSCP_REMOTE_VARIABLE_CODE_STRING;
                 j_rply["arg"]["value"] = vscp_convertToBase64(str);
-            } else {
+            } 
+            else {
                 // Unknown variable
-                j_rply["op"] = "readvar";
-                j_rply["rv"] = "error";
+                j_rply["op"] = "writevar";
+                j_rply["rv"] = VSCP_ERROR_UNKNOWN_ITEM;
                 j_rply["note"] = "Unknown variable.";
             }
         }
-    } else if ( "save" == hlo_op ) {
-        if (m_bDebug) {
-            syslog(LOG_ERR,
-                    "[vscpl2drv-logger] HLO_OP_SAVE - Saving "
-                    "configuration.");
+    }
+    // ------------------------------------------------------------------------
+    else if ("save" == hlo_op) {
+        if (!m_bWrite) {
+            // Must be write enabled
+            j_rply["op"] = "save";
+            j_rply["rv"] = VSCP_ERROR_WRITE_ERROR;
+            j_rply["note"] = "Write operations is disabled.";
+        } 
+        else {            
+            if (doSaveConfig()) {
+                if (m_bDebug) {
+                    syslog(LOG_ERR,
+                        "[vscpl2drv-logger] HLO_OP_SAVE - Saving "
+                        "configuration. Success.");
+                }
+                // OK
+                j_rply["op"] = "save";
+                j_rply["rv"] = VSCP_ERROR_SUCCESS;
+            }
+            else {
+                if (m_bDebug) {
+                    syslog(LOG_DEBUG,
+                        "[vscpl2drv-logger] HLO_OP_SAVE - Saving "
+                        "configuration. Failure.");
+                }
+                // ERROR
+                j_rply["op"] = "save";
+                j_rply["rv"] = VSCP_ERROR_ERROR;
+                j_rply["note"] = "Failed to save configuration.";
+            }
         }
-        doSaveConfig();
-    } else if ( "load" == hlo_op ) {
-        syslog(LOG_ERR,
-            "[vscpl2drv-logger] HLO_OP_LOAD - Loading "
-            "configuration.");
-        doLoadConfig();
-    } else if ( "open" == hlo_op ) {
-        if (m_bDebug) {
-            syslog(LOG_ERR,
-                    "[vscpl2drv-logger] HLO-CMD OPEN - Opening logfile "
-                    "[%s][%s] .",
-                    m_pathLogFile.c_str(),
-                    (m_logStream.is_open() ? "open" : "closed"));
+    }
+    // ------------------------------------------------------------------------
+    else if ( "load" == hlo_op ) {
+        if ( doLoadConfig() ) {
+            if (m_bDebug) {
+                    syslog(LOG_DEBUG,
+                        "[vscpl2drv-logger] HLO_OP_LOAD - Saving "
+                        "configuration. Success.");
+                }
+            // OK
+            j_rply["op"] = "load";
+            j_rply["rv"] = VSCP_ERROR_SUCCESS;
+            j_rply["note"] = "Successfully loaded configuration.";
         }
-
+        else {
+            if (m_bDebug) {
+                    syslog(LOG_DEBUG,
+                        "[vscpl2drv-logger] HLO_OP_LOAD - Loading "
+                        "configuration. Failure.");
+            }
+            // ERROR
+            j_rply["op"] = "load";
+            j_rply["rv"] = VSCP_ERROR_ERROR;
+            j_rply["note"] = "Failed to load configuration.";
+        }
+    } 
+    // ------------------------------------------------------------------------
+    else if ( "open" == hlo_op ) {  
         if (!m_logStream.is_open()) {
-            if (!openLogFile()) {
+            if (openLogFile()) {
+                if (m_bDebug) {
+                    syslog(LOG_DEBUG,
+                            "[vscpl2drv-logger] HLO-CMD OPEN - Opening logfile "
+                            "[%s][%s] .",
+                            m_pathLogFile.c_str(),
+                            (m_logStream.is_open() ? "open" : "closed"));                                
+                }
+                // OK
+                j_rply["op"] = "open";
+                j_rply["rv"] = VSCP_ERROR_SUCCESS;
+            }
+            else {
                 syslog(LOG_ERR,
                         "[vscpl2drv-logger] HLO-CMD OPEN - Failed to "
                         "open logfile [%s].",
                         m_pathLogFile.c_str());
+                // ERROR
+                j_rply["op"] = "open";
+                j_rply["rv"] = VSCP_ERROR_ERROR;
+                j_rply["note"] = vscp_str_format("Failed to open logfile %s.",m_pathLogFile.c_str());                        
             }
         }
-    } else if ( "close" == hlo_op ) {
+        else {
+            syslog(LOG_ERR,
+                        "[vscpl2drv-logger] HLO-CMD OPEN - logfile "
+                        "already open [%s].",
+                        m_pathLogFile.c_str());
+            // ERROR
+            j_rply["op"] = "open";
+            j_rply["rv"] = VSCP_ERROR_ERROR;
+            j_rply["note"] = vscp_str_format("Logfile is already open %s.",m_pathLogFile.c_str());
+        }
+    }
+    // ------------------------------------------------------------------------
+    else if ( "close" == hlo_op ) {
+        if (m_bDebug) {
+            syslog(LOG_ERR,
+                    "[vscpl2drv-logger] HLO-CMD CLOSE - Closing "
+                    "logfile [%s][%s] .",
+                    m_pathLogFile.c_str(),
+                    (m_logStream.is_open() ? "open" : "closed"));
+        }
 
-            if (m_bDebug) {
-                syslog(LOG_ERR,
-                        "[vscpl2drv-logger] HLO-CMD CLOSE - Closing "
-                        "logfile [%s][%s] .",
-                        m_pathLogFile.c_str(),
-                        (m_logStream.is_open() ? "open" : "closed"));
-            }
+        if (m_logStream.is_open()) {
+            m_logStream.close();
+        }
 
-            if (m_logStream.is_open()) {
-                m_logStream.close();
-            }
-    } else if ( "start" == hlo_op ) {
-        // Start the worker thread
-        
-    } else if ( "stop" == hlo_op ) {
-        // Stop the worker thread
-
-    }  else if ( "restart" == hlo_op ) {
-        // Restart the worker thread
-
+        // OK
+        j_rply["op"] = "close";
+        j_rply["rv"] = VSCP_ERROR_SUCCESS;
     }
     else {
         // Unknow command
+        if (m_bDebug) {
+            syslog(LOG_ERR,
+                    "[vscpl2drv-logger] HLO-CMD unknown command "
+                    "logfile [%s][%s] .",
+                    hlo_op.c_str(),
+                    m_pathLogFile.c_str());
+        }
+        // ERROR
+        j_rply["op"] = hlo_op;
+        j_rply["rv"] = VSCP_ERROR_UNKNOWN_ITEM;
     }
 
     std::string rply = j_rply.dump();
@@ -761,14 +886,17 @@ CLog::readEncryptionKey(const std::string& path)
     std::string line;
 
     if (path.size()) {
+
         std::string line;
         std::ifstream keyfile(path);
+
         if (keyfile.is_open()) {
             getline(keyfile, line);
             vscp_trim(line);
             keySize = vscp_hexStr2ByteArray(m_key, 32, line.c_str());
             keyfile.close();
-        } else {
+        } 
+        else {
             syslog(LOG_ERR, "[vscpl2drv-logger] Failed to get encryption key.");
         }
     }
@@ -790,14 +918,17 @@ CLog::eventExToReceiveQueue(const vscpEventEx& ex)
         vscp_deleteEvent(pev);
         return false;
     }
+
     if (NULL != pev) {
         pthread_mutex_lock(&m_mutexReceiveQueue);
         m_receiveList.push_back(pev);
         sem_post(&m_semReceiveQueue);
         pthread_mutex_unlock(&m_mutexReceiveQueue);
-    } else {
+    } 
+    else {
         syslog(LOG_ERR, "[vscpl2drv-logger] Unable to allocate event storage.");
     }
+
     return true;
 }
 
@@ -888,7 +1019,8 @@ CLog::openLogFile(void)
                     break;
             }
 
-        } else {
+        } 
+        else {
 
             m_logStream.open(m_pathLogFile, std::ios::out | std::ios::app);
             if (!m_logStream.is_open()) {
@@ -961,7 +1093,8 @@ CLog::writeEvent2Log(vscpEvent* pEvent)
 
             m_logStream.flush();
 
-        } else if (m_logFmt == logFmtXml) {
+        } 
+        else if (m_logFmt == logFmtXml) {
 
             // Event
             m_logStream << "<event>\n";
@@ -1019,7 +1152,8 @@ CLog::writeEvent2Log(vscpEvent* pEvent)
 
             m_logStream.flush();
 
-        } else if (m_logFmt == logFmtJson) {
+        } 
+        else if (m_logFmt == logFmtJson) {
             if ( vscp_convertEventToJSON(str, pEvent) ) {
                 json j;
 
@@ -1029,10 +1163,12 @@ CLog::writeEvent2Log(vscpEvent* pEvent)
                 m_logStream << j.dump();
                 m_logStream << ",";
                 m_logStream.flush();
-            } else {
+            } 
+            else {
                 syslog(LOG_ERR, "[vscpl2drv-logger] Failed to convert event to JSON.");
             }
-        } else {
+        } 
+        else {
             syslog(LOG_ERR, "[vscpl2drv-logger] Invalid log format set.");
         }
     }
@@ -1067,18 +1203,22 @@ threadWorker(void* pData)
         if (-1 == (rv = vscp_sem_wait(&pLog->m_semSendQueue, 500))) {
             if (ETIMEDOUT == errno) {
                 continue;
-            } else if (EINTR == errno) {
+            } 
+            else if (EINTR == errno) {
                 syslog(LOG_ERR,
                        "[vscpl2drv-logger] Interrupted by a signal handler");
                 continue;
-            } else if (EINVAL == errno) {
+            } 
+            else if (EINVAL == errno) {
                 syslog(LOG_ERR,
                        "[vscpl2drv-logger] Invalid semaphore (timout)");
                 break;
-            } else if (EAGAIN == errno) {
+            } 
+            else if (EAGAIN == errno) {
                 syslog(LOG_ERR, "[vscpl2drv-logger] Blocking error");
                 break;
-            } else {
+            } 
+            else {
                 syslog(LOG_ERR, "[vscpl2drv-logger] Unknown error");
                 break;
             }

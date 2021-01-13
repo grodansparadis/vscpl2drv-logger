@@ -92,7 +92,7 @@
 
     <div class="container">
       <div class="btn-group-justified">
-          <button type="button" class="btn btn-primary" data-toggle="modal" id="btnSettings" onclick="showMQTTSettings()" >Settings</button>
+          <button type="button" class="btn btn-primary" data-toggle="modal" id="btnSettings" onclick="showMQTTSettings()" >MQTT Settings</button>
           <button type="button" class="btn btn-primary" data-toggle="modal" id="btnConnect" onclick="doConnect()">Connect</button>
           <button type="button" class="btn btn-primary" data-toggle="modal" id="btnConnect" onclick="doDisconnect()">Disconnect</button>
           <label class="control-label col-sm-8 text-info" id="status_text">Unconnected</label>
@@ -119,6 +119,7 @@
           <div class="control-checkbox col-sm-offset-2 col-sm-10 text-secondary">            
             <b><label class="checkbox-inline text-secondary"><input type="checkbox" id="frmSettingsDebug" name="optcheckbox" value="true"> Debug </label></b>
             <b><label class="checkbox-inline text-secondary"><input type="checkbox" id="frmSettingsOverwrite" name="optcheckbox" value="true"> Overwrite </label></b>
+            <b><label class="checkbox-inline text-secondary" id="lblWrite"><input type="checkbox" id="frmSettingsWrite" name="optcheckbox" value="true"> Write enable </label></b>
           </div>
         </div>
 
@@ -127,7 +128,7 @@
           <div class="radio col-sm-offset-2 col-sm-10">            
             <b><label class="radio-inline text-secondary"><input type="radio" id="frmSettingsOptString" name="optradio" value="str"> String</label></b>
             <b><label class="radio-inline text-secondary"><input type="radio" id="frmSettingsOptXml" name="optradio" value="xml"> XML</label></b>
-            <b><label class="radio-inline text-secondary"><input type="radio" id="frmSettingsOptJson" name="optradio" value="json"> JSON</label></b>            
+            <b><label class="radio-inline text-secondary"><input type="radio" id="frmSettingsOptJson" name="optradio" value="json" > JSON</label></b>            
           </div>
         </div>
 
@@ -158,9 +159,11 @@
           <button type="button" class="btn btn-success" data-toggle="modal" id="btnReadSettings" onclick="doReadSettings()">Read</button>
           <button type="button" class="btn btn-success" data-toggle="modal" id="btnWriteSettings" onclick="doWriteSettings()">Write</button>
           &nbsp;&nbsp;&nbsp;&nbsp;
-          <button type="button" class="btn btn-warning" data-toggle="modal" id="btnWriteSettings" onclick="doStart()">Start</button>
-          <button type="button" class="btn btn-warning" data-toggle="modal" id="btnWriteSettings" onclick="doStop()">Stop</button>
-          <button type="button" class="btn btn-warning" data-toggle="modal" id="btnWriteSettings" onclick="doRestart()">Restart</button>          
+          <button type="button" class="btn btn-primary" data-toggle="modal" id="btnLoadSettings" onclick="doLoad()">Load config.</button>
+          <button type="button" class="btn btn-primary" data-toggle="modal" id="btnSaveSettings" onclick="doSave()">Save config.</button>
+          &nbsp;&nbsp;&nbsp;&nbsp;
+          <button type="button" class="btn btn-warning" data-toggle="modal" id="btnWriteSettings" onclick="doOpenLogFile()">Open</button>
+          <button type="button" class="btn btn-warning" data-toggle="modal" id="btnWriteSettings" onclick="doCloseLogFile()">Close</button>         
         </div>
 
       </form>
@@ -219,7 +222,8 @@
              
 
         // --------------------------------------------------------------------
-        function transfer_settings() {
+        function transfer_settings() 
+        {
 
           // Debug
           if (settings.debug === true) {
@@ -230,10 +234,14 @@
 
           // Overwrite
           if (settings.debug === true) {
-            $('#frmSettingsDebug').prop('checked', true);
+            $('#frmSettingsOverwrite').prop('checked', true);
           } else {
-            $('#frmSettingsDebug').prop('checked', false);
+            $('#frmSettingsOverwrite').prop('checked', false);
           }
+
+          // Write
+          $('#lblWrite').prop('disabled', true);
+          $('#frmSettingsWrite').prop('disabled', true);
 
           // Log file format
           if (settings.format === 0) {
@@ -264,7 +272,8 @@
         transfer_settings();
 
         // --------------------------------------------------------------------
-        function showMQTTSettings() {
+        function showMQTTSettings() 
+        {
           $('#mqtt_host').prop('value', mqtt.host);
           $('#mqtt_port').prop('value', mqtt.port);
           $('#mqtt_username').prop('value', mqtt.username);
@@ -276,7 +285,8 @@
         }
 
         // --------------------------------------------------------------------
-        function transferMQTTSettings() {
+        function transferMQTTSettings() 
+        {
           //mqtt.host = document.getElementById("mqtt_host").value;
           mqtt.host = $('#mqtt_host').val();
           mqtt.port = Number($('#mqtt_port').val());
@@ -289,7 +299,8 @@
         }
 
         // --------------------------------------------------------------------
-        function doConnect() {
+        function doConnect() 
+        {
           // Create a client instance
           console.log("Connecting to " + mqtt.host + ":" + mqtt.port + " - " + mqtt.clientid);
           mqtt.client = new Paho.MQTT.Client(mqtt.host, Number(mqtt.port), mqtt.clientid);
@@ -311,12 +322,39 @@
         };
 
         // --------------------------------------------------------------------
-        function doDisconnect() {
+        function doDisconnect() 
+        {
           mqtt.client.disconnect();
         };
 
         // --------------------------------------------------------------------
-        function doNOOP() {
+        function sendHlo(guid, hlo, e) 
+        {
+          
+          // Construct publish topic
+          var publish = Mustache.render(mqtt.publish, { "class": e.vscpClass, "type": e.vscpType } );
+
+          // Set destination GUID          
+          let i = 0;
+          guid.forEach(item => e.vscpData[i++] = parseInt(item, 16));
+
+          // Set HLO type and encryption byte
+          e.vscpData[16] = (hloDataCoding.VSCP_HLO_TYPE_JSON << 4) + hloEncryption.VSCP_HLO_ENCRYPTION_NONE;
+
+          // Pack JSON into event
+          let cmdobj = JSON.stringify(hlo);
+          let tokens_cmdobj = cmdobj.toString().match(/./gi);
+          let arr = tokens_cmdobj.map(t => t.charCodeAt(0));
+          e.vscpData = e.vscpData.concat(arr);
+
+          message = new Paho.MQTT.Message(JSON.stringify(e.toJSONObj()));
+          message.destinationName = publish;
+          mqtt.client.send(message);
+        };        
+
+        // --------------------------------------------------------------------
+        function doNOOP() 
+        {
 
           if (!bConnected) {
             alert("Must be connected to MQTT broker to send NOOP HLO command.");
@@ -330,38 +368,37 @@
           e.setDumbNode();  // We are a dumb node
           e.vscpGuid = mqtt.ourguid;
           e.vscpClass = vscp_class.VSCP_CLASS2_HLO;
-          e.vscpType = vscp_type.VSCP2_TYPE_HLO_COMMAND;
-
-          // Construct publish topic
-          var publish = Mustache.render(mqtt.publish, { "class": e.vscpClass, "type": e.vscpType } );
+          e.vscpType = vscp_type.VSCP2_TYPE_HLO_COMMAND;          
 
           // Build the command
           hlo = {};
           hlo.op = "noop";
           hlo.arg = [];
           
-          // Set destination GUID          
-          let i = 0;
-          GUID.forEach(item => e.vscpData[i++] = parseInt(item, 16));
+          // // Set destination GUID          
+          // let i = 0;
+          // GUID.forEach(item => e.vscpData[i++] = parseInt(item, 16));
 
-          // Set HLO type and encryption byte
-          e.vscpData[16] = (hloDataCoding.VSCP_HLO_TYPE_JSON << 4) + hloEncryption.VSCP_HLO_ENCRYPTION_NONE;
+          // // Set HLO type and encryption byte
+          // e.vscpData[16] = (hloDataCoding.VSCP_HLO_TYPE_JSON << 4) + hloEncryption.VSCP_HLO_ENCRYPTION_NONE;
 
-          // Encode HLO in BASE64
-          //let cmdobj = btoa(JSON.stringify(hlo));
-          let cmdobj = JSON.stringify(hlo);
-          let tokens_cmdobj = cmdobj.toString().match(/./gi);
-          let arr = tokens_cmdobj.map(t => t.charCodeAt(0));
-          e.vscpData = e.vscpData.concat(arr);
+          // // Encode HLO in BASE64
+          // //let cmdobj = btoa(JSON.stringify(hlo));
+          // let cmdobj = JSON.stringify(hlo);
+          // let tokens_cmdobj = cmdobj.toString().match(/./gi);
+          // let arr = tokens_cmdobj.map(t => t.charCodeAt(0));
+          // e.vscpData = e.vscpData.concat(arr);
 
-          message = new Paho.MQTT.Message(JSON.stringify(e.toJSONObj()));
-          message.destinationName = publish;
-          mqtt.client.send(message);
-          
+          // message = new Paho.MQTT.Message(JSON.stringify(e.toJSONObj()));
+          // message.destinationName = publish;
+          // mqtt.client.send(message);
+          sendHlo(GUID, hlo, e);
         };
 
         // --------------------------------------------------------------------
-        function doReadSettings() {
+        function doReadSettings() 
+        {
+
           if (!bConnected) {
             alert("Must be connected to MQTT broker to use HLO read command.");
             return;
@@ -377,43 +414,232 @@
           e.vscpType = vscp_type.VSCP2_TYPE_HLO_COMMAND;
 
           // Construct publish topic
-          var publish = Mustache.render(mqtt.publish, { "class": e.vscpClass, "type": e.vscpType } );
+          // var publish = Mustache.render(mqtt.publish, { "class": e.vscpClass, "type": e.vscpType } );
 
           // Build the command
           hlo = {};
           hlo.op = "readvar";
-          hlo.arg = "debug";
-          
-          // Set destination GUID          
-          let i = 0;
-          GUID.forEach(item => e.vscpData[i++] = parseInt(item, 16));
 
-          // Set HLO type and encryption byte
-          e.vscpData[16] = (hloDataCoding.VSCP_HLO_TYPE_JSON << 4) + hloEncryption.VSCP_HLO_ENCRYPTION_NONE;
+          // Read variable "debug"  
+          hlo.arg = "debug";        
+          sendHlo(GUID, hlo, e);
 
-          // Encode HLO in BASE64
-          //let cmdobj = btoa(JSON.stringify(hlo));
-          let cmdobj = JSON.stringify(hlo);
-          let tokens_cmdobj = cmdobj.toString().match(/./gi);
-          let arr = tokens_cmdobj.map(t => t.charCodeAt(0));
-          e.vscpData = e.vscpData.concat(arr);
+          // Read variable "write" 
+          hlo.arg = "write"; 
+          e.vscpData = [];       
+          sendHlo(GUID, hlo, e);
 
-          message = new Paho.MQTT.Message(JSON.stringify(e.toJSONObj()));
-          message.destinationName = publish;
-          mqtt.client.send(message);
+          // Read variable "overwrite" 
+          hlo.arg = "overwrite"; 
+          e.vscpData = [];       
+          sendHlo(GUID, hlo, e);
+
+          // Read variable "logfmt" 
+          hlo.arg = "logfmt"; 
+          e.vscpData = [];       
+          sendHlo(GUID, hlo, e);
+
+          // Read variable "path" 
+          hlo.arg = "path"; 
+          e.vscpData = [];       
+          sendHlo(GUID, hlo, e);
+
+          // Read variable "filter" 
+          hlo.arg = "filter"; 
+          e.vscpData = [];       
+          sendHlo(GUID, hlo, e);
+
+          // Read variable "mask" 
+          hlo.arg = "mask"; 
+          e.vscpData = [];       
+          sendHlo(GUID, hlo, e);
+
         };
 
         // --------------------------------------------------------------------
-        function doWriteSettings() {
-          alert("Write Settings");
-          var frm = $('#frmSettings').serializeArray();
-          console.log(frm);
+        function doWriteSettings() 
+        {
+          
+          if (!bConnected) {
+            alert("Must be connected to MQTT broker to use HLO read command.");
+            return;
+          }
+          console.log("Read settings....");
+          // Get destination GUID
+          let GUID = $('#frmSettingsDriverGuid').val().split(":");
+
+          e = new Event();          
+          e.setDumbNode();  // We are a dumb node
+          e.vscpGuid = mqtt.ourguid;
+          e.vscpClass = vscp_class.VSCP_CLASS2_HLO;
+          e.vscpType = vscp_type.VSCP2_TYPE_HLO_COMMAND;
+
+          // Construct publish topic
+          // var publish = Mustache.render(mqtt.publish, { "class": e.vscpClass, "type": e.vscpType } );
+
+          // Build the command
+          hlo = {};
+          hlo.op = "writevar";
+          hlo.arg = [];
+
+          // write variable "debug"  
+          hlo.arg[0] = "debug";
+          hlo.arg[1] = $('#frmSettingsDebug').is(':checked') ? "true" : "false";
+          e.vscpData = []; 
+          sendHlo(GUID, hlo, e);
+
+          // write variable "overwrite"  
+          hlo.arg[0] = "overwrite";
+          hlo.arg[1] = $('#frmSettingsOverwrite').is(':checked') ? "true" : "false";
+          e.vscpData = []; 
+          sendHlo(GUID, hlo, e);
+
+          // write variable "logfmt" 
+          hlo.arg[0] = "logfmt";
+          if ($('#frmSettingsOptString').is(':checked')) {
+            hlo.arg[1] = "0";
+          } else if ($('#frmSettingsOptXml').is(':checked')) {
+            hlo.arg[1] = "1";
+          }
+          else if ($('#frmSettingsOptJson').is(':checked')) {
+            hlo.arg[1] = "2";
+          } else {
+            hlo.arg[1] = "0";
+          } 
+          
+          e.vscpData = []; 
+          sendHlo(GUID, hlo, e);
+
+          // write variable "path"  
+          hlo.arg[0] = "path";
+          hlo.arg[1] = window.btoa($('#frmSettingsPath').val());
+
+          e.vscpData = []; 
+          sendHlo(GUID, hlo, e);
+
+
+          // write variable "filter"  
+          hlo.arg[0] = "filter";
+          hlo.arg[1] = window.btoa($('#frmSettingsFilter').val());
+
+          e.vscpData = []; 
+          sendHlo(GUID, hlo, e);
+
+
+          // write variable "mask"  
+          hlo.arg[0] = "mask";
+          hlo.arg[1] = window.btoa($('#frmSettingsMask').val());
+
+          e.vscpData = []; 
+          sendHlo(GUID, hlo, e);
         };
 
+
+        // --------------------------------------------------------------------
+        function doLoad() 
+        {   
+          if (!bConnected) {
+            alert("Must be connected to MQTT broker to use HLO read command.");
+            return;
+          }
+
+          // Get destination GUID
+          let GUID = $('#frmSettingsDriverGuid').val().split(":");
+
+          e = new Event();          
+          e.setDumbNode();  // We are a dumb node
+          e.vscpGuid = mqtt.ourguid;
+          e.vscpClass = vscp_class.VSCP_CLASS2_HLO;
+          e.vscpType = vscp_type.VSCP2_TYPE_HLO_COMMAND;
+
+          // Build the command
+          hlo = {};
+          hlo.op = "load";
+          hlo.arg = [];
+
+          sendHlo(GUID, hlo, e);
+        }
+
+        // --------------------------------------------------------------------
+        function doSave() 
+        {
+          if (!bConnected) {
+            alert("Must be connected to MQTT broker to use HLO read command.");
+            return;
+          }
+
+          // Get destination GUID
+          let GUID = $('#frmSettingsDriverGuid').val().split(":");
+
+          e = new Event();          
+          e.setDumbNode();  // We are a dumb node
+          e.vscpGuid = mqtt.ourguid;
+          e.vscpClass = vscp_class.VSCP_CLASS2_HLO;
+          e.vscpType = vscp_type.VSCP2_TYPE_HLO_COMMAND;
+
+          // Build the command
+          hlo = {};
+          hlo.op = "save";
+          hlo.arg = [];
+
+          sendHlo(GUID, hlo, e);
+        }
+
+
+        // --------------------------------------------------------------------
+        function doOpenLogFile() 
+        {
+          if (!bConnected) {
+            alert("Must be connected to MQTT broker to use HLO read command.");
+            return;
+          }
+
+          // Get destination GUID
+          let GUID = $('#frmSettingsDriverGuid').val().split(":");
+
+          e = new Event();          
+          e.setDumbNode();  // We are a dumb node
+          e.vscpGuid = mqtt.ourguid;
+          e.vscpClass = vscp_class.VSCP_CLASS2_HLO;
+          e.vscpType = vscp_type.VSCP2_TYPE_HLO_COMMAND;
+
+          // Build the command
+          hlo = {};
+          hlo.op = "open";
+          hlo.arg = [];
+
+          sendHlo(GUID, hlo, e);    
+        }
+
+        // --------------------------------------------------------------------
+        function doCloseLogFile()
+        {
+          if (!bConnected) {
+            alert("Must be connected to MQTT broker to use HLO read command.");
+            return;
+          }
+
+          // Get destination GUID
+          let GUID = $('#frmSettingsDriverGuid').val().split(":");
+
+          e = new Event();          
+          e.setDumbNode();  // We are a dumb node
+          e.vscpGuid = mqtt.ourguid;
+          e.vscpClass = vscp_class.VSCP_CLASS2_HLO;
+          e.vscpType = vscp_type.VSCP2_TYPE_HLO_COMMAND;
+
+          // Build the command
+          hlo = {};
+          hlo.op = "close";
+          hlo.arg = [];
+
+          sendHlo(GUID, hlo, e);
+        }
         
         // --------------------------------------------------------------------
         // called when the client connects
-        function onConnect() {
+        function onConnect() 
+        {
             bConnected = true;
 
             console.log("Connected to remote MQTT host.");
@@ -432,14 +658,16 @@
         }
 
         // --------------------------------------------------------------------
-        function onFailure(message) {
+        function onFailure(message) 
+        {
           console.log("Connection attempt to host " + mqtt.host + ":" + mqtt.port + " failed.");
           $("#status_text").text("Connection attempt to host " + mqtt.host + ":" + mqtt.port + " failed.");
         }
         
         // --------------------------------------------------------------------
         // called when the client loses its connection
-        function onConnectionLost(responseObject) {
+        function onConnectionLost(responseObject) 
+        {
             bConnected = false;
             if (responseObject.errorCode !== 0) {
                 console.log("onConnectionLost:"+responseObject.errorMessage);
@@ -453,7 +681,8 @@
         
         // --------------------------------------------------------------------
         // called when a message arrives
-        function onMessageArrived(message) {
+        function onMessageArrived(message) 
+        {
 
             // Get event
             let e = JSON.parse(message.payloadString);
@@ -462,26 +691,111 @@
             console.log(e.vscpType);
             
             if ((vscp_class.VSCP_CLASS2_HLO  === e.vscpClass) && 
-                (vscp_type.VSCP2_TYPE_HLO_RESPONSE === e.vscpType)) {
+                (vscp_type.VSCP2_TYPE_HLO_RESPONSE === e.vscpType)) 
+                {
               
-                  // Get GUID
+              // Get GUID
               let guid = e.vscpData.slice(0,15);
               
               // Get encoding
               let encoding = e.vscpData[16];
 
               // Get response    
-              let hloRespone = JSON.parse(String.fromCharCode.apply(null, e.vscpData.slice(17)));
-              console.log(hloRespone);
-              if ("noop" === hloRespone.op) {
-                console.log("noop - response: rv=",hloRespone.rv);
-                $('#rxtable').html("noop: rv = " + hloRespone.rv + "<br>" + $('#rxtable').html() ); 
-              }
-              else if ("read" === hloRespone.op) {
-                console.log("noop - response: rv=",hloRespone.rv);
-                $('#rxtable').html("noop: rv = " + hloRespone.rv + "<br>" + $('#rxtable').html() ); 
-              }
+              let hloResponse = JSON.parse(String.fromCharCode.apply(null, e.vscpData.slice(17)));
+              console.log(hloResponse);
 
+              if ("noop" === hloResponse.op) {
+                console.log("noop - response: rv=",hloResponse.rv);
+                $('#rxtable').html("noop: rv = " + hloResponse.rv + "<br>" + $('#rxtable').html() ); 
+              }
+              else if ("readvar" === hloResponse.op) {
+                console.log("debug - response: rv=",hloResponse.rv);
+                $('#rxtable').html("read: rv = " + hloResponse.rv + "<br>" + $('#rxtable').html() );
+
+                // arg is object for readvar  
+                if ((typeof hloResponse.arg === 'object') && (hloResponse.arg !== null)) {
+                  if (("debug" === hloResponse.arg.name) && 
+                      (remoteVarType.REMOTE_VARIABLE_CODE_BOOLEAN === hloResponse.arg.type)) {
+                    if (hloResponse.arg.value) { 
+                      $('#frmSettingsDebug').prop('checked', true);                                            
+                    }
+                    else {
+                      $('#frmSettingsDebug').prop('checked', false);
+                    }
+                  } else if (("write" === hloResponse.arg.name) && 
+                             (remoteVarType.REMOTE_VARIABLE_CODE_BOOLEAN === hloResponse.arg.type)) {
+                    console.log("Read write");
+                    if (hloResponse.arg.value) { 
+                      $('#frmSettingsWrite').prop('checked', true);
+                    }
+                    else {
+                      $('#frmSettingsWrite').prop('checked', false);
+                    }
+                  } else if (("overwrite" === hloResponse.arg.name) && 
+                             (remoteVarType.REMOTE_VARIABLE_CODE_BOOLEAN === hloResponse.arg.type)) {
+                    console.log("Read overwrite");
+                    if (hloResponse.arg.value) { 
+                      $('#frmSettingsOverwrite').prop('checked', true);
+                    }
+                    else {
+                      $('#frmSettingsOverwrite').prop('checked', false);
+                    }
+                  } else if (("logfmt" === hloResponse.arg.name) && 
+                             (remoteVarType.REMOTE_VARIABLE_CODE_UINT8 === hloResponse.arg.type)) {                               
+                    console.log("Read logfmt -->");
+                    if (0 === hloResponse.arg.value) { 
+                      // String
+                      $('#frmSettingsOptString').prop('checked', true);
+                    }
+                    else if (1 === hloResponse.arg.value) {
+                      // XML
+                      $('#frmSettingsOptXml').prop('checked', true);
+                    } 
+                    else if (2 === hloResponse.arg.value) { 
+                      // JSON
+                      $('#frmSettingsOptJson').prop('checked', true);
+                    }
+                    else {
+                      // Unknown log format
+                      $('#frmSettingsOptString').prop('checked', false);
+                      $('#frmSettingsOptXml').prop('checked', false);
+                      $('#frmSettingsOptJson').prop('checked', false);
+                    } 
+                  } else if (("path" === hloResponse.arg.name) && 
+                             (remoteVarType.REMOTE_VARIABLE_CODE_STRING === hloResponse.arg.type)) {
+                    console.log("Read path");
+                    $('#frmSettingsPath').val(atob(hloResponse.arg.value));
+                  } else if (("filter" === hloResponse.arg.name) && 
+                             (remoteVarType.REMOTE_VARIABLE_CODE_STRING === hloResponse.arg.type)) {
+                    console.log("Read filter");
+                    $('#frmSettingsFilter').val(atob(hloResponse.arg.value));
+                  } else if (("mask" === hloResponse.arg.name) && 
+                             (remoteVarType.REMOTE_VARIABLE_CODE_STRING === hloResponse.arg.type)) {
+                    console.log("Read mask");
+                    $('#frmSettingsMask').val(atob(hloResponse.arg.value));
+                  } else {
+                    console.log("Read of unknown variable");
+                  }
+                } 
+              }
+              else if ("writevar" === hloResponse.op) {
+                console.log("write - response: rv=",hloResponse.rv);
+                $('#rxtable').html("write: rv = " + hloResponse.rv + "<br>" + $('#rxtable').html() ); 
+              }
+              else if ("open" === hloResponse.op) {
+                console.log("write - response: rv=",hloResponse.rv);
+                if (VSCP_ERROR_SUCCESS === hloResponse.rv)
+                $('#rxtable').html("write: rv = " + hloResponse.rv + "<br>" + $('#rxtable').html() );
+              }
+              else if ("close" === hloResponse.op) {
+              
+              }
+              else if ("load" === hloResponse.op) {
+
+              }
+              else if ("save" === hloResponse.op) {
+              
+              }
             }
 
         }

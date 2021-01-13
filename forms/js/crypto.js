@@ -1,5 +1,6 @@
 // Needs CryptoJS - https://cryptojs.gitbook.io/docs/
 // https://embed.plnkr.co/0VPU1zmmWC5wmTKPKnhg/
+// https://stackoverflow.com/questions/29760761/aes-256-on-the-client-side-js-and-in-the-server-php
 //
 // Sent as [salt,iv,message]
 //

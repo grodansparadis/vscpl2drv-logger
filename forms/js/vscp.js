@@ -210,6 +210,99 @@ const hloEncryption = {
     VSCP_HLO_ENCRYPTION_AES256:     3
 };
 
+/**
+ * VSCP remote variable types
+ */
+const remoteVarType = {
+  REMOTE_VARIABLE_CODE_UNASSIGNED:       0,  // No value
+  REMOTE_VARIABLE_CODE_STRING:           1,  // String value
+  REMOTE_VARIABLE_CODE_BOOLEAN:          2,  // Boolean value
+  REMOTE_VARIABLE_CODE_INTEGER:          3,  // Integer value
+  REMOTE_VARIABLE_CODE_NUMBER:           3,  // Integer value synonym
+  REMOTE_VARIABLE_CODE_LONG:             4,  // Long value
+  REMOTE_VARIABLE_CODE_DOUBLE:           5,  // Floating point value
+  REMOTE_VARIABLE_CODE_MEASUREMENT:      6,  // VSCP data coding
+  REMOTE_VARIABLE_CODE_EVENT:            7,  // VSCP event (Level II)
+  REMOTE_VARIABLE_CODE_GUID:             8,  // VSCP GUID
+  REMOTE_VARIABLE_CODE_EVENT_DATA:       9,  // VSCP event data
+  REMOTE_VARIABLE_CODE_EVENT_CLASS:      10, // VSCP event class
+  REMOTE_VARIABLE_CODE_EVENT_TYPE:       11, // VSCP event type
+  REMOTE_VARIABLE_CODE_EVENT_TIMESTAMP:  12, // VSCP event timestamp
+  REMOTE_VARIABLE_CODE_DATETIME:         13, // Date + Time in iso format
+  REMOTE_VARIABLE_CODE_DATE:             14, // Date in iso format
+  REMOTE_VARIABLE_CODE_TIME:             15, // Time in iso format
+  REMOTE_VARIABLE_CODE_BLOB:             16, // Base64 binary encoded data
+  REMOTE_VARIABLE_CODE_UINT8:            17,
+  REMOTE_VARIABLE_CODE_UINT16:           18,
+  REMOTE_VARIABLE_CODE_UINT32:           19,
+  REMOTE_VARIABLE_CODE_UINT64:           20,
+  REMOTE_VARIABLE_CODE_INT8:             21,
+  REMOTE_VARIABLE_CODE_INT16:            22,
+  REMOTE_VARIABLE_CODE_INT32:            23,
+  REMOTE_VARIABLE_CODE_INT64:            24,
+  REMOTE_VARIABLE_CODE_MIME:             100, // Mime type (mime-type;base64 encoded content)
+  REMOTE_VARIABLE_CODE_HTML:             101, // HTML Page
+  REMOTE_VARIABLE_CODE_JAVASCRIPT:       102, // Javascript code
+  REMOTE_VARIABLE_CODE_JSON:             103, // JSON data
+  REMOTE_VARIABLE_CODE_XML:              104, // XML data
+  REMOTE_VARIABLE_CODE_SQL:              105, // SQL data
+  REMOTE_VARIABLE_CODE_PYTHON:           106, // Python code
+  REMOTE_VARIABLE_CODE_LUA:              200  // LUA code
+};
+
+
+const vscpErr = {
+  VSCP_ERROR_SUCCESS:             0,
+  VSCP_ERROR_ERROR:              -1,  /* Error */
+  VSCP_ERROR_CHANNEL:             7,  /* Invalid channel */
+  VSCP_ERROR_FIFO_EMPTY:          8,  /* FIFO is empty */
+  VSCP_ERROR_FIFO_FULL:           9,  /* FIFI is full */
+  VSCP_ERROR_FIFO_SIZE:           10, /* FIFO size error */
+  VSCP_ERROR_FIFO_WAIT:           11, /* FIFO wait failed */
+  VSCP_ERROR_GENERIC:             12, /* Generic error */
+  VSCP_ERROR_HARDWARE:            13, /* Hardware error */
+  VSCP_ERROR_INIT_FAIL:           14, /* Initialization failed */
+  VSCP_ERROR_INIT_MISSING:        15, /* No init */
+  VSCP_ERROR_INIT_READY:          16, /* Failed init */
+  VSCP_ERROR_NOT_SUPPORTED:       17, /* Not supported */
+  VSCP_ERROR_OVERRUN:             18, /* Overrun */
+  VSCP_ERROR_RCV_EMPTY:           19, /* Receive buffer empty */
+  VSCP_ERROR_REGISTER:            20, /* Register value error */
+  VSCP_ERROR_TRM_FULL:            21, /* Transmit buffer full */
+  VSCP_ERROR_LIBRARY:             28, /* Unable to load library */
+  VSCP_ERROR_PROCADDRESS:         29, /* Unable get library proc. address */
+  VSCP_ERROR_ONLY_ONE_INSTANCE:   30, /* Only one instance allowed */
+  VSCP_ERROR_SUB_DRIVER:          31, /* Problem with sub driver call */
+  VSCP_ERROR_TIMEOUT:             32, /* Time-out */
+  VSCP_ERROR_NOT_OPEN:            33, /* The device is not open. */
+  VSCP_ERROR_PARAMETER:           34, /* A parameter is invalid. */
+  VSCP_ERROR_MEMORY:              35, /* Memory exhausted. */
+  VSCP_ERROR_INTERNAL:            36, /* Some kind of internal program error */
+  VSCP_ERROR_COMMUNICATION:       37, /* Some kind of communication error */
+  VSCP_ERROR_USER:                38, /* Login error user name */
+  VSCP_ERROR_PASSWORD:            39, /* Login error password */
+  VSCP_ERROR_CONNECTION:          40, /* Could not connect */
+  VSCP_ERROR_INVALID_HANDLE:      41, /* The handle is not valid */
+  VSCP_ERROR_OPERATION_FAILED:    42, /* Operation failed for some reason */
+  VSCP_ERROR_BUFFER_TO_SMALL:     43, /* Supplied buffer is to small to fit content */
+  VSCP_ERROR_UNKNOWN_ITEM:        44, /* Requested item (remote variable) is unknown */
+  VSCP_ERROR_ALREADY_DEFINED:     45, /* The name is already in use. */
+  VSCP_ERROR_WRITE_ERROR:         46, /* Error when writing data */
+  VSCP_ERROR_STOPPED:             47, /* Operation stopped or aborted */
+  VSCP_ERROR_INVALID_POINTER:     48, /* Pointer with invalid value */
+  VSCP_ERROR_INVALID_PERMISSION:  49, /* Not allowed to do that */
+  VSCP_ERROR_INVALID_PATH:        50, /* Invalid path (permissions) */
+  VSCP_ERROR_ERRNO:               51, /* General error, errno variable holds error */
+  VSCP_ERROR_INTERUPTED:          52, /* Interrupted by signal or other cause */
+  VSCP_ERROR_MISSING:             53, /* Value, paramter or something else is missing */ 
+  VSCP_ERROR_NOT_CONNECTED:       54, /* There is no connection */
+  VSCP_ERROR_READ_ONLY:           55, /* Item (variable) is read only */  
+  VSCP_ERROR_INVALID_TYPE:        56, /* Item (variable) is of wrong type */
+  VSCP_ERROR_PERMISSION:          57, /* Does hot have permission to do that */
+  VSCP_ERROR_INVALID_SYNTAX:      58, /* Syntax is invalid */
+  VSCP_ERROR_INDEX_OOB:           59 /* Index is out of bounds */
+};
+
 /* ---------------------------------------------------------------------- */
 
 
