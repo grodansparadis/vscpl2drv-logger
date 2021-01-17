@@ -293,14 +293,14 @@ const vscpErr = {
   VSCP_ERROR_INVALID_PERMISSION:  49, /* Not allowed to do that */
   VSCP_ERROR_INVALID_PATH:        50, /* Invalid path (permissions) */
   VSCP_ERROR_ERRNO:               51, /* General error, errno variable holds error */
-  VSCP_ERROR_INTERUPTED:          52, /* Interrupted by signal or other cause */
+  VSCP_ERROR_INTERRUPTED:         52, /* Interrupted by signal or other cause */
   VSCP_ERROR_MISSING:             53, /* Value, paramter or something else is missing */ 
   VSCP_ERROR_NOT_CONNECTED:       54, /* There is no connection */
   VSCP_ERROR_READ_ONLY:           55, /* Item (variable) is read only */  
   VSCP_ERROR_INVALID_TYPE:        56, /* Item (variable) is of wrong type */
   VSCP_ERROR_PERMISSION:          57, /* Does hot have permission to do that */
   VSCP_ERROR_INVALID_SYNTAX:      58, /* Syntax is invalid */
-  VSCP_ERROR_INDEX_OOB:           59 /* Index is out of bounds */
+  VSCP_ERROR_INDEX_OOB:           59  /* Index is out of bounds */
 };
 
 /* ---------------------------------------------------------------------- */

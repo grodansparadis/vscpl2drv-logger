@@ -783,18 +783,44 @@
                 $('#rxtable').html("write: rv = " + hloResponse.rv + "<br>" + $('#rxtable').html() ); 
               }
               else if ("open" === hloResponse.op) {
-                console.log("write - response: rv=",hloResponse.rv);
-                if (VSCP_ERROR_SUCCESS === hloResponse.rv)
-                $('#rxtable').html("write: rv = " + hloResponse.rv + "<br>" + $('#rxtable').html() );
+                console.log("open - response: rv=",hloResponse.rv);
+                if (vscpErr.VSCP_ERROR_SUCCESS === hloResponse.rv) {
+                  $('#rxtable').html("cmd: open - rv = " + hloResponse.rv + "<br>" + $('#rxtable').html() );
+                }
+                else {
+                  alert(hloResponse.note);
+                  $('#rxtable').html("cmd: open - rv = " + hloResponse.rv + " - note = " + hloResponse.note + "<br>" + $('#rxtable').html() );
+                }
               }
               else if ("close" === hloResponse.op) {
-              
+                console.log("close - response: rv=",hloResponse.rv);
+                if (vscpErr.VSCP_ERROR_SUCCESS === hloResponse.rv) {
+                  $('#rxtable').html("cmd: close - rv = " + hloResponse.rv + "<br>" + $('#rxtable').html() );
+                }
+                else {
+                  alert(hloResponse.note);
+                  $('#rxtable').html("cmd: close - rv = " + hloResponse.rv + " - note = " + hloResponse.note + "<br>" + $('#rxtable').html() );
+                }
               }
               else if ("load" === hloResponse.op) {
-
+                console.log("load - response: rv=",hloResponse.rv);
+                if (vscpErr.VSCP_ERROR_SUCCESS === hloResponse.rv) {
+                  $('#rxtable').html("cmd: load - rv = " + hloResponse.rv + "<br>" + $('#rxtable').html() );
+                }
+                else {
+                  alert(hloResponse.note);
+                  $('#rxtable').html("cmd: load - rv = " + hloResponse.rv + " - note = " + hloResponse.note + "<br>" + $('#rxtable').html() );
+                }
               }
               else if ("save" === hloResponse.op) {
-              
+                console.log("save - response: rv=",hloResponse.rv);
+                if (vscpErr.VSCP_ERROR_SUCCESS === hloResponse.rv) {
+                  $('#rxtable').html("cmd: save - rv = " + hloResponse.rv + "<br>" + $('#rxtable').html() );
+                }
+                else {
+                  alert(hloResponse.note);
+                  $('#rxtable').html("cmd: save - rv = " + hloResponse.rv + " - note = " + hloResponse.note + "<br>" + $('#rxtable').html() );
+                }
               }
             }
 

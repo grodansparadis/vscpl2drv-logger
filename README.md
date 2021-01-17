@@ -139,4 +139,4 @@ The [manual](https://docs.vscp.org/#vscpd) for vscpd contains full documentation
 The vscpd source code may be downloaded from [https://github.com/grodansparadis/vscp](https://github.com/grodansparadis/vscp). Source code for other system components of VSCP & Friends are here [https://github.com/grodansparadis](https://github.com/grodansparadis)
 
 ## COPYRIGHT
-Copyright (C) 2000-2020 Ake Hedman, Grodans Paradis AB - MIT license.
+Copyright (C) 2000-2021 Ake Hedman, Grodans Paradis AB - MIT license.
