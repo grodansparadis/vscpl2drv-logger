@@ -4,7 +4,7 @@
         {
             "taskName": "build vscpl2drv-logger",
             "type": "shell",
-            "command": "rm -rf dist; make",
+            "command": "cd build; cmake .. -DCMAKE_BUILD_TYPE=Debug; make",
             "args": [],
             "group": {
                 "kind": "build",
@@ -13,7 +13,7 @@
             "problemMatcher": "$gcc"
         },
         {
-            "taskName": "clean & build vscpl2drv-logger",
+            "taskName": "mkdir build; cd build; rm CMakeCache.txt; cmake --clean-first .. -DCMAKE_BUILD_TYPE=Debug; make clean; make",
             "type": "shell",
             "command": "rm -rf dist; make clean; make",
             "args": [],
@@ -37,7 +37,7 @@
         {
             "taskName": "build debian package",
             "type": "shell",
-            "command": "./build_debian_package.sh",
+            "command": "cd build; cpack",
             "args": [],
             "group": {
                 "kind": "build",

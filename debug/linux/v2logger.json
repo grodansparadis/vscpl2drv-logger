@@ -1,0 +1,24 @@
+{
+  "debug" : true,
+  "write" : false,
+  "path" : "/tmp/vscplogger.log",
+  "overwrite" : false,
+  "logfmt" : 2, 
+  "logging" : {
+    "file-enable-log": true,
+    "file-log-level" : "debug",
+    "file-pattern" : "[vcpl2drv-logger %c] [%^%l%$] %v",
+    "file-path" : "/var/log/vscp/vscpl2drv-logger.log",
+    "file-max-size" : 5242880,
+    "file-max-files" : 7,
+    "console-enable-log": true,
+    "console-log-level" : "debug",
+    "console-pattern" : "[vcpl2drv-logger %c] [%^%l%$] %v"
+  },
+  "filter" : {
+    "in-filter" : "incoming filter on string form",
+    "in-mask" : "incoming mask on string form",
+    "out-filter" : "outgoing filter on string form",
+    "out-mask" : "outgoing mask on string form"
+  } 
+}
