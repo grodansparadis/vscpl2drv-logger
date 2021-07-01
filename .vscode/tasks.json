@@ -13,9 +13,9 @@
             "problemMatcher": "$gcc"
         },
         {
-            "taskName": "mkdir build; cd build; rm CMakeCache.txt; cmake --clean-first .. -DCMAKE_BUILD_TYPE=Debug; make clean; make",
+            "taskName": "clean & build vscpl2drv-logger",
             "type": "shell",
-            "command": "rm -rf dist; make clean; make",
+            "command": "mkdir build; cd build; rm CMakeCache.txt; cmake --clean-first .. -DCMAKE_BUILD_TYPE=Debug; make clean; make",
             "args": [],
             "group": {
                 "kind": "build",

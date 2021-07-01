@@ -87,8 +87,8 @@
       {
         "enable" : true,
         "name" : "Logger",
-        "path-driver" : "/home/akhe/development/VSCP/vscpl2drv-logger/linux/vscpl2drv-logger.so",
-        "path-config" : "/home/akhe/development/VSCP/vscpl2drv-logger/debug/v2logger.json",
+        "path-driver" : "/home/akhe/development/VSCP/vscpl2drv-logger/build/libvscpl2drv-logger.so",
+        "path-config" : "/home/akhe/development/VSCP/vscpl2drv-logger/debug/linux/v2logger.json",
         "guid" : "FF:FF:FF:FF:FF:FF:FF:F5:02:11:11:00:00:00:00:01",
 
         "mqtt": {

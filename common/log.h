@@ -34,6 +34,9 @@
 #include <list>
 #include <string>
 
+#include "spdlog/spdlog.h"
+#include "spdlog/sinks/rotating_file_sink.h"
+
 // https://github.com/nlohmann/json
 using json = nlohmann::json;
 
@@ -158,6 +161,23 @@ class CLog
 
   public:
 
+    /////////////////////////////////////////////////////////
+    //                      Logging
+    /////////////////////////////////////////////////////////
+    
+    bool m_bEnableFileLog;                    // True to enable logging
+    spdlog::level::level_enum m_fileLogLevel; // log level
+    std::string m_fileLogPattern;             // log file pattern
+    std::string m_path_to_log_file;           // Path to logfile      
+    uint32_t m_max_log_size;                  // Max size for logfile before rotating occures 
+    uint16_t m_max_log_files;                 // Max log files to keep
+
+    bool m_bConsoleLogEnable;                     // True to enable logging to console
+    spdlog::level::level_enum m_consoleLogLevel;  // Console log level
+    std::string m_consoleLogPattern;              // Console log pattern
+
+    // ------------------------------------------------------------------------
+
     // JSON configuration object
     json m_j_config;
 
@@ -204,7 +224,8 @@ class CLog
     pthread_t m_pWrkThread;
 
     /// Filter
-    vscpEventFilter m_vscpfilterTx;
+    vscpEventFilter m_filterIn;
+    vscpEventFilter m_filterOut;
 
     // Queue
     std::list<vscpEvent*> m_sendList;
