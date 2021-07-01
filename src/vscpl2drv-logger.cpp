@@ -31,6 +31,7 @@
 #include <unistd.h>
 #include <syslog.h>
 
+#include "version.h"
 #include "vscpl2drv-logger.h"
 #include <canal_macro.h>
 #include <log.h>

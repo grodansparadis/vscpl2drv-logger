@@ -66,5 +66,7 @@ dist/*
 
 Makefile
 linux/Makefile
+build/
+man/build/
 
 
