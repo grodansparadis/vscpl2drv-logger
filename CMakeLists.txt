@@ -2,7 +2,7 @@
 #
 # Build instructions for VSCP Works.
 #
-# Copyright (c) 2000-2021 Åke Hedman, the VSCP Project
+# Copyright (c) 2000-2023 Åke Hedman, the VSCP Project
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -39,7 +39,7 @@ if(NOT DEFINED MINOR_VERSION)
     SET(MINOR_VERSION "0")
 endif()
 if(NOT DEFINED PATCH_VERSION)
-    SET(PATCH_VERSION "0")
+    SET(PATCH_VERSION "1")
 endif()
 
 # Prevent abi warnings in nlohmann
@@ -205,7 +205,7 @@ add_library(vscpl2drv-logger
   ./common/log.cpp
   ./common/log.cpp   
   ${VSCP_PATH}/src/common/third_party/mustache.hpp
-  ${VSCP_PATH}/src/common/third_party/spdlog-1.9.2/include    
+  ./third_party/spdlog/include/spdlog/spdlog.h    
   ${VSCP_PATH}/src/vscp/common/vscp.h
   ${VSCP_PATH}/src/vscp/common/vscpremotetcpif.h
   ${VSCP_PATH}/src/vscp/common/vscpremotetcpif.cpp
@@ -243,8 +243,8 @@ if (WIN32)
     ${VSCP_PATH}/src/vscp/common/  
     ${VSCP_PATH}/src/common
     ${VSCP_PATH}/src/common/third_party
-    ${VSCP_PATH}/src/common/third_party/nlohmann
-    ${VSCP_PATH}/src/common/third_party/spdlog-1.9.2/include
+    ./third_party/nlohmann/include
+    ./third_party/spdlog/include
     ${PThreads4W_INCLUDE_DIR}
     ${CMAKE_BINARY_DIR}
     ${OPENSSL_INCLUDE_DIR}
@@ -255,8 +255,8 @@ else()
     ${VSCP_PATH}/src/vscp/common/
     ${VSCP_PATH}/src/common
     ${VSCP_PATH}/src/common/third_party
-    ${VSCP_PATH}/src/common/third_party/nlohmann
-    ${VSCP_PATH}/src/common/third_party/spdlog-1.9.2/include
+    ./third_party/nlohmann/include
+    ./third_party/spdlog/include
     ${CMAKE_BINARY_DIR}
     ${OPENSSL_INCLUDE_DIR}
     ${LOCAL_SYSLOG_INCLUDE} )

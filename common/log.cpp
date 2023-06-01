@@ -7,7 +7,7 @@
 //
 // This file is part of the VSCP Project (http://www.vscp.org)
 //
-// Copyright (C) 2000-2021 Ake Hedman,
+// Copyright (C) 2000-2023 Ake Hedman,
 // Grodans Paradis AB, <akhe@grodansparadis.com>
 //
 // This file is distributed in the hope that it will be useful,
@@ -43,7 +43,7 @@
 #include <vscpdatetime.h>
 #include <vscphelper.h>
 
-#include <json.hpp> // Needs C++11  -std=c++11
+#include <nlohmann/json.hpp> // Needs C++11  -std=c++11
 #include <mustache.hpp>
 
 #include <spdlog/async.h>
@@ -368,7 +368,7 @@ CLog::doLoadConfig(void)
     }
 
     if (m_bDebug) {
-      spdlog::debug( "ReadConfig: 'logfmt' set to %d", m_logFmt);
+      spdlog::debug( "ReadConfig: 'logfmt' set to {0}", (int)m_logFmt);
     }
   }
   catch (...) {

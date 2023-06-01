@@ -7,7 +7,7 @@
 //
 // This file is part of the VSCP (http://www.vscp.org)
 //
-// Copyright (C) 2000-2021 Ake Hedman,
+// Copyright (C) 2000-2023 Ake Hedman,
 // Grodans Paradis AB, <akhe@grodansparadis.com>
 //
 // This file is distributed in the hope that it will be useful,
@@ -27,7 +27,7 @@
 #include <vscp.h>
 #include <vscpremotetcpif.h>
 
-#include <json.hpp>  // Needs C++11  -std=c++11
+#include <nlohmann/json.hpp>  // Needs C++11  -std=c++11
 #include <mustache.hpp>
 
 #include <fstream>
