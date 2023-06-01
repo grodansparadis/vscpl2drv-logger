@@ -42,6 +42,7 @@ if(NOT DEFINED PATCH_VERSION)
     SET(PATCH_VERSION "1")
 endif()
 
+
 # Prevent abi warnings in nlohmann
 SET(GCC_VSCP_COMPILE_FLAGS "-Wno-psabi")
 # Profiling
@@ -166,6 +167,9 @@ IF(EXISTS "${CMAKE_ROOT}/Modules/CPack.cmake")
 
 ENDIF(EXISTS "${CMAKE_ROOT}/Modules/CPack.cmake")
 
+# Disable abi warnings (nlohmann)
+SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_VSCP_COMPILE_FLAGS}")
+SET(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} ${GCC_VSCP_LINK_FLAGS}")
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
