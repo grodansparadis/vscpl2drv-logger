@@ -107,10 +107,10 @@ CLog::CLog()
   auto console = spdlog::stdout_color_mt("console");
   // Start out with level=info. Config may change this
   console->set_level(spdlog::level::debug);
-  console->set_pattern("[vscpl2drv-websrv: %c] [%^%l%$] %v");
+  console->set_pattern("[vscpl2drv-logger: %c] [%^%l%$] %v");
   spdlog::set_default_logger(console);
 
-  console->debug("Starting the vscpl2drv-tcpipsrv...");
+  console->debug("Starting the vscpl2drv-logger driver...");
 
   // Setting up logging defaults
   m_bConsoleLogEnable = true;
