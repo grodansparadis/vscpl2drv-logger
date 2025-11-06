@@ -6,7 +6,7 @@
 
 ![driver model](/images/xmap-vscpl2drv-logger.png)
 
-The logger driver is a level II driver that work as a  logger that can log VSCP events to a file. This can be useful in debugging and analysis of VSCP networks. Loged events can be importen into tools like vVSCP Works for further analysis.
+VSCP level II driver for diagnostic logging. It makes it possible to log VSCP events from a source to a file. Three formats of the log file is currently supported. Either a standard text string i logged for for each event or logging entries can be logged on XML or JSON format. The advantage of the later is that it can be read by VSCP works and further analyzed there. Several drivers can be used to write logging data to different output files and using different filter/masks for complex logging.
 
 
 The level II driver is [described here](https://grodansparadis.github.io/vscp-doc-spec/#/./vscp_driver_interfaces). With the simple interface API the VSCP level II driver uses (described above) it is also easy to use it with other software as a component.
