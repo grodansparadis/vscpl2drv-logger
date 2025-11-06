@@ -2,7 +2,7 @@
 //
 // Build instructions for VSCP Works.
 //
-// Copyright (c) 2000-2023 Åke Hedman, the VSCP Project
+// Copyright (c) 2000-2025 Åke Hedman, the VSCP Project
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +23,7 @@
 // SOFTWARE.
 //
 
-#define MAJOR_VERSION       15
-#define MINOR_VERSION       0
-#define RELEASE_VERSION     0
-#define BUILD_VERSION       0
+#define VSCPL2DRV_LOGGER_MAJOR_VERSION       15
+#define VSCPL2DRV_LOGGER_MINOR_VERSION       1
+#define VSCPL2DRV_LOGGER_RELEASE_VERSION     0
+#define VSCPL2DRV_LOGGER_BUILD_VERSION       0

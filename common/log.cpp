@@ -38,8 +38,8 @@
 
 #include <hlo.h>
 #include <remotevariablecodes.h>
-#include <vscp_class.h>
-#include <vscp_type.h>
+#include <vscp-class.h>
+#include <vscp-type.h>
 #include <vscpdatetime.h>
 #include <vscphelper.h>
 

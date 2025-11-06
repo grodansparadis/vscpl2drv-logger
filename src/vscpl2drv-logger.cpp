@@ -7,7 +7,7 @@
 //
 // This file is part of the VSCP (http://www.vscp.org)
 //
-// Copyright (C) 2000-2023 Ake Hedman,
+// Copyright (C) 2000-2025 Ake Hedman,
 // Grodans Paradis AB, <akhe@grodansparadis.com>
 //
 // This file is distributed in the hope that it will be useful,
@@ -33,7 +33,7 @@
 
 #include "version.h"
 #include "vscpl2drv-logger.h"
-#include <canal_macro.h>
+#include <canal-macro.h>
 #include <log.h>
 
 void _init() __attribute__((constructor));
@@ -260,7 +260,7 @@ extern "C" int VSCPRead(long handle, vscpEvent *pEvent, unsigned long timeout) {
 //
 
 extern "C" unsigned long VSCPGetVersion(void) {
-  unsigned long ver = MAJOR_VERSION << 24 | MINOR_VERSION << 16 |
-                      RELEASE_VERSION << 8 | BUILD_VERSION;
+  unsigned long ver = VSCPL2DRV_LOGGER_MAJOR_VERSION << 24 | VSCPL2DRV_LOGGER_MINOR_VERSION << 16 |
+                      VSCPL2DRV_LOGGER_RELEASE_VERSION << 8 | VSCPL2DRV_LOGGER_BUILD_VERSION;
   return ver;
 }
