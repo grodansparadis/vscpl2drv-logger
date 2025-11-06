@@ -281,6 +281,24 @@ add_library(vscpl2drv-logger
   ./third_party/vscp/src/vscp/common/vscp.h
   ./third_party/vscp/src/vscp/common/vscphelper.h
   ./third_party/vscp/src/vscp/common/vscphelper.cpp
+  ./third_party/vscp/src/vscp/common/guid.h
+  ./third_party/vscp/src/vscp/common/guid.cpp 
+  ./third_party/vscp/src/vscp/common/vscp.h
+  ./third_party/vscp/src/vscp/common/vscpdatetime.h
+  ./third_party/vscp/src/vscp/common/vscpdatetime.cpp
+  ./third_party/vscp/src/vscp/common/canal.h
+  ./third_party/vscp/src/common/vscpbase64.h
+  ./third_party/vscp/src/common/vscpbase64.c
+  ./third_party/vscp/src/common/vscp-aes.h
+  ./third_party/vscp/src/common/vscp-aes.c
+  ./third_party/vscp/src/common/crc.h
+  ./third_party/vscp/src/common/crc.c
+  ./third_party/vscp/src/common/crc8.h
+  ./third_party/vscp/src/common/crc8.c
+  ./third_party/vscp/src/common/vscpmd5.h
+  ./third_party/vscp/src/common/vscpmd5.c
+  ./third_party/crypto-algorithms/sha256.h
+  ./third_party/crypto-algorithms/sha256.c
 )
 
 if (WIN32)
