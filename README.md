@@ -135,7 +135,7 @@ The driver configuration looks like this.
  - **write** enables configuration write functionality if set to *true*. If enables remember that the configuration file must be placed at a location that is writable by the VSCP daemon.
  - **path** is the path to the file where the logging data will be written.
  - **overwrite** set to *true* to overwrite the data in the log file onm every restart. If set to false data will be appended to the log file.
- - **format** Can be set to zero for string log format, 1 for XML log format and 2 for JSON log format. 
+ - **format** Can be set to 0 for string log format, 1 for XML log format and 2 for JSON log format. 
  - **filter** can be used to filter the steam of events to just log a limited amount of events. Both are on format **priority, class, type, guid**. Default is to log all events. out-filter/out-mask is traffic from the interface. in-filter/in.mask is not used at the moment.
 
 ## Install the driver

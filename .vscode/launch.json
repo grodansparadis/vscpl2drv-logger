@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "/home/akhe/development/VSCP/vscp/build/vscpd",
-            "args": ["-s","-c/home/akhe/development/VSCP/vscpl2drv-tcpipsrv/debug/linux/vscpd.json"],
+            "args": ["-s","-c/home/akhe/development/VSCP/vscpl2drv-logger/debug/linux/vscpd.json"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/../vscp",
             "environment": [],
@@ -22,15 +22,15 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "build vscpl2drv-websocksrv",
+            "preLaunchTask": "build vscpl2drv-logger",
             "miDebuggerPath": "/usr/bin/gdb"
         },
         {
             "name": "(gdb) testapp w/ driver",
             "type": "cppdbg",
             "request": "launch",
-            "program": "/home/akhe/development/VSCP/vscpl2drv-websocksrv/build/testapp/testapp",
-            "args": ["-s","-c/home/akhe/development/VSCP/vscpl2drv-websocksrv/debug/linux/websocksrv.json"],
+            "program": "/home/akhe/development/VSCP/vscpl2drv-logger/build/testapp/testapp",
+            "args": ["-s","-c/home/akhe/development/VSCP/vscpl2drv-logger/debug/linux/v2logger.json"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/../vscp",
             "environment": [],
@@ -43,7 +43,7 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "build vscpl2drv-websocksrv",
+            "preLaunchTask": "build vscpl2drv-logger",
             "miDebuggerPath": "/usr/bin/gdb"
         }
     ]

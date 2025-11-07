@@ -1,1 +1,1 @@
-This simple application is used to test the websocket driver
+This simple application is used to test the logger driver

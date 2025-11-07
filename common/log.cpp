@@ -42,7 +42,7 @@
 #include <unistd.h>
 #endif
 
-//#include <expat.h>
+// #include <expat.h>
 #include <vscpbase64.h>
 
 #include <hlo.h>
@@ -52,8 +52,8 @@
 #include <vscpdatetime.h>
 #include <vscphelper.h>
 
-#include <nlohmann/json.hpp> // Needs C++11  -std=c++11
 #include <mustache.hpp>
+#include <nlohmann/json.hpp> // Needs C++11  -std=c++11
 
 #include <spdlog/async.h>
 #include <spdlog/sinks/rotating_file_sink.h>
@@ -66,9 +66,6 @@
 using json = nlohmann::json;
 
 using namespace kainjow::mustache;
-
-// Buffer size for XML parser
-//#define XML_BUFF_SIZE 10000
 
 // Forward declarations
 void*
@@ -102,10 +99,10 @@ CLog::CLog()
   vscp_clearVSCPFilter(&m_filterOut); // Sent from interface
 
 #ifdef _WIN32
-  m_semSendQueue = CreateSemaphore(NULL, 0, LONG_MAX, NULL);
+  m_semSendQueue    = CreateSemaphore(NULL, 0, LONG_MAX, NULL);
   m_semReceiveQueue = CreateSemaphore(NULL, 0, LONG_MAX, NULL);
 
-  m_mutexSendQueue = CreateMutex(NULL, FALSE, NULL);
+  m_mutexSendQueue    = CreateMutex(NULL, FALSE, NULL);
   m_mutexReceiveQueue = CreateMutex(NULL, FALSE, NULL);
 #else
   sem_init(&m_semSendQueue, 0, 0);
@@ -115,31 +112,15 @@ CLog::CLog()
   pthread_mutex_init(&m_mutexReceiveQueue, NULL);
 #endif
 
+  // Setting up logging defaults
+  m_consoleLogLevel = spdlog::level::debug;
+  m_fileLogLevel    = spdlog::level::debug;
+
   // Init pool
   spdlog::init_thread_pool(8192, 1);
 
   // Flush log every five seconds
   spdlog::flush_every(std::chrono::seconds(5));
-
-  auto console = spdlog::stdout_color_mt("console");
-  // Start out with level=info. Config may change this
-  console->set_level(spdlog::level::debug);
-  console->set_pattern("[vscpl2drv-logger: %c] [%^%l%$] %v");
-  spdlog::set_default_logger(console);
-
-  console->debug("Starting the vscpl2drv-logger driver...");
-
-  // Setting up logging defaults
-  m_bConsoleLogEnable = true;
-  m_consoleLogLevel   = spdlog::level::info;
-  m_consoleLogPattern = "[vscpl2drv-tcpipsrv %c] [%^%l%$] %v";
-
-  m_bEnableFileLog   = true;
-  m_fileLogLevel     = spdlog::level::info;
-  m_fileLogPattern   = "[vscpl2drv-tcpipsrv %c] [%^%l%$] %v";
-  m_path_to_log_file = "/var/log/vscp/vscpl2drv-tcpipsrv.log";
-  m_max_log_size     = 5242880;
-  m_max_log_files    = 7;
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -171,27 +152,25 @@ CLog::~CLog()
 //
 
 bool
-CLog::open(std::string& pathcfg, cguid& guid)
+CLog::open(std::string& path, cguid& guid)
 {
+  // Save path for HLO
+  m_pathConfigFile = path;
+
   // Set GUID
   m_guid = guid;
 
-  // Save config path
-  m_pathConfigFile = pathcfg;
-
   // Read configuration file
-  if (!doLoadConfig()) {
-    spdlog::error(
-           "[vscpl2drv-logger] Failed to load configuration file [%s]",
-           m_pathConfigFile.c_str());
+  if (!doLoadConfig(path)) {
+    spdlog::error("[vscpl2drv-logger] Failed to load configuration file [%s]",
+                  path.c_str());
   }
 
   // Not allowed to have append and VSCP Works format
   if (m_logFmt != logFmtString) {
     m_bOverWrite = true;
-    spdlog::warn(
-           "[vscpl2drv-logger] VSCP Works format require that "
-           "overwrite=\"true\". Now forced to true.");
+    spdlog::warn("[vscpl2drv-logger] VSCP Works format require that "
+                 "overwrite=\"true\". Now forced to true.");
   }
 
   // start the worker thread
@@ -274,16 +253,57 @@ CLog::setMask(vscpEvent* pMask)
 //
 
 bool
-CLog::doLoadConfig(void)
+CLog::doLoadConfig(std::string& path)
 {
-  try {
-    std::ifstream in(m_pathConfigFile, std::ifstream::in);
-    in >> m_j_config;
+  spdlog::info("doLoadConfig <{}>.", path.c_str());
+
+  // Take away possible whitespace
+  vscp_trim(path);
+
+  // If first character of path is "{" expand it to home directory
+  // we expect path to be a JSON string for us to parse
+  if ('{' == path.at(0)) {
+    spdlog::info("Configuration appears to be a JSON string.");
+    try {
+      m_j_config = json::parse(path);
+    }
+    catch (json::parse_error) {
+      spdlog::critical("Failed to parse JSON configuration.");
+      return VSCP_ERROR_PARSING;
+    }
+    catch (std::exception& e) {
+      spdlog::critical("Failed to parse configuration. Exception='{}'",
+                       e.what());
+      return VSCP_ERROR_PARSING;
+    }
+    catch (...) {
+      spdlog::critical("Failed to parse configuration due to unknown error.");
+      return VSCP_ERROR_PARSING;
+    }
   }
-  catch (...) {
-    spdlog::error(
-           "[vscpl2drv-logger] Failed to parse JSON configuration.");
-    return false;
+  // If path is a file read it
+  else if (vscp_fileExists(path)) {
+    spdlog::info("Configuration appears to be a file.");
+    try {
+      std::ifstream in(path, std::ifstream::in);
+      in >> m_j_config;
+    }
+    catch (json::parse_error) {
+      spdlog::critical("Failed to parse JSON configuration.");
+      return VSCP_ERROR_PARSING;
+    }
+    catch (std::exception& e) {
+      spdlog::critical("Failed to parse configuration. Exception='{}'",
+                       e.what());
+      return VSCP_ERROR_PARSING;
+    }
+    catch (...) {
+      spdlog::critical("Failed to parse configuration due to unknown error.");
+      return VSCP_ERROR_PARSING;
+    }
+  }
+  else {
+    return VSCP_ERROR_PARAMETER;
   }
 
   try {
@@ -292,18 +312,16 @@ CLog::doLoadConfig(void)
     }
     else {
       spdlog::error(
-             "ReadConfig: Failed to read 'debug'. Default will be used.");
+        "ReadConfig: Failed to read 'debug'. Default will be used.");
     }
 
     if (m_bDebug) {
-      spdlog::debug(
-             "ReadConfig: 'debug' set to %s",
-             m_bDebug ? "true" : "false");
+      spdlog::debug("ReadConfig: 'debug' set to %s",
+                    m_bDebug ? "true" : "false");
     }
   }
   catch (...) {
-    spdlog::error(
-           "ReadConfig: Failed to read 'debug'. Default will be used.");
+    spdlog::error("ReadConfig: Failed to read 'debug'. Default will be used.");
   }
 
   try {
@@ -312,18 +330,16 @@ CLog::doLoadConfig(void)
     }
     else {
       spdlog::error(
-             "ReadConfig: Failed to read 'write'. Default will be used.");
+        "ReadConfig: Failed to read 'write'. Default will be used.");
     }
 
     if (m_bDebug) {
-      spdlog::debug(
-             "ReadConfig: 'write' set to %s",
-             m_bWrite ? "true" : "false");
+      spdlog::debug("ReadConfig: 'write' set to %s",
+                    m_bWrite ? "true" : "false");
     }
   }
   catch (...) {
-    spdlog::error(
-           "ReadConfig: Failed to read 'write'. Default will be used.");
+    spdlog::error("ReadConfig: Failed to read 'write'. Default will be used.");
   }
 
   try {
@@ -336,7 +352,7 @@ CLog::doLoadConfig(void)
     }
 
     if (m_bDebug) {
-      spdlog::debug( "ReadConfig: 'path' set to %s", m_pathLogFile.c_str());
+      spdlog::debug("ReadConfig: 'path' set to %s", m_pathLogFile.c_str());
     }
   }
   catch (...) {
@@ -351,18 +367,17 @@ CLog::doLoadConfig(void)
     }
     else {
       spdlog::error(
-             "ReadConfig: Failed to read 'overwrite'. Default will be used.");
+        "ReadConfig: Failed to read 'overwrite'. Default will be used.");
     }
 
     if (m_bDebug) {
-      spdlog::debug(
-             "ReadConfig: 'overwrite' set to %s",
-             m_bOverWrite ? "true" : "false");
+      spdlog::debug("ReadConfig: 'overwrite' set to %s",
+                    m_bOverWrite ? "true" : "false");
     }
   }
   catch (...) {
     spdlog::error(
-           "ReadConfig: Failed to read 'overwrite'. Default will be used.");
+      "ReadConfig: Failed to read 'overwrite'. Default will be used.");
   }
 
   try {
@@ -379,8 +394,8 @@ CLog::doLoadConfig(void)
 
         default:
           spdlog::error(
-                 "ReadConfig: Log format set to default due to invalid config "
-                 "value.");
+            "ReadConfig: Log format set to default due to invalid config "
+            "value.");
 
         case 0: // String
           m_logFmt = logFmtString;
@@ -389,18 +404,17 @@ CLog::doLoadConfig(void)
     }
     else {
       spdlog::error(
-             "ReadConfig: Failed to read 'logfmt'. Default will be used.");
+        "ReadConfig: Failed to read 'logfmt'. Default will be used.");
     }
 
     if (m_bDebug) {
-      spdlog::debug( "ReadConfig: 'logfmt' set to {0}", (int)m_logFmt);
+      spdlog::debug("ReadConfig: 'logfmt' set to {0}", (int)m_logFmt);
     }
   }
   catch (...) {
     spdlog::error(
-           "ReadConfig: Failed to read 'worksfmt'. Default will be used.");
+      "ReadConfig: Failed to read 'worksfmt'. Default will be used.");
   }
-
 
   // Filter
   if (m_j_config.contains("filter") && m_j_config["filter"].is_object()) {
@@ -488,14 +502,34 @@ CLog::doLoadConfig(void)
     }
   }
 
-  
+  ///////////////////////////////////////////////////////////////////////////
+  //                          logging
+  ///////////////////////////////////////////////////////////////////////////
 
-  // Logging
   if (m_j_config.contains("logging") && m_j_config["logging"].is_object()) {
 
     json j = m_j_config["logging"];
 
-    // Logging: file-log-level
+    // Logging: file-logging-enable
+    if (j.contains("file-enable-log")) {
+      try {
+        m_bEnableFileLog = j["file-enable-log"].get<bool>();
+      }
+      catch (const std::exception& ex) {
+        spdlog::error("ReadConfig:Failed to read 'file-enable-log' Error='{}'",
+                      ex.what());
+      }
+      catch (...) {
+        spdlog::error(
+          "ReadConfig:Failed to read 'file-enable-log' due to unknown error.");
+      }
+    }
+    else {
+      spdlog::debug("ReadConfig: Failed to read LOGGING 'file-enable-log' "
+                    "Defaults will be used.");
+    }
+
+    // Logging: log-level for  file
     if (j.contains("file-log-level")) {
       std::string str;
       try {
@@ -503,12 +537,12 @@ CLog::doLoadConfig(void)
       }
       catch (const std::exception& ex) {
         spdlog::error(
-          "[vscpl2drv-tcpipsrv]Failed to read 'file-log-level' Error='{}'",
+          "[vscpl2drv-websocksrv]Failed to read 'file-log-level' Error='{0}'",
           ex.what());
       }
       catch (...) {
-        spdlog::error("[vscpl2drv-tcpipsrv]Failed to read 'file-log-level' due "
-                      "to unknown error.");
+        spdlog::error("[vscpl2drv-websocksrv]Failed to read 'file-log-level' "
+                      "due to unknown error.");
       }
       vscp_makeLower(str);
       if (std::string::npos != str.find("off")) {
@@ -618,9 +652,99 @@ CLog::doLoadConfig(void)
                     "Defaults will be used.");
     }
 
+    // * * * CONSOLE LOGGING * * *
+
+    // Logging: console-logging-enable
+    if (j.contains("console-enable-log")) {
+      try {
+        m_bConsoleLogEnable = j["console-enable-log"].get<bool>();
+      }
+      catch (const std::exception& ex) {
+        spdlog::error(
+          "ReadConfig:Failed to read 'console-enable-log' Error='{}'",
+          ex.what());
+      }
+      catch (...) {
+        spdlog::error("ReadConfig:Failed to read 'console-enable-log' due to "
+                      "unknown error.");
+      }
+    }
+    else {
+      spdlog::debug("ReadConfig: Failed to read LOGGING 'console-enable-log' "
+                    "Defaults will be used.");
+    }
+
+    // Logging: log-level for console
+    if (j.contains("console-log-level")) {
+      std::string str;
+      try {
+        str = j["console-log-level"].get<std::string>();
+      }
+      catch (const std::exception& ex) {
+        spdlog::error("[vscpl2drv-websocksrv]Failed to read "
+                      "'console-log-level' Error='{0}'",
+                      ex.what());
+      }
+      catch (...) {
+        spdlog::error("[vscpl2drv-websocksrv]Failed to read "
+                      "'console-log-level' due to unknown error.");
+      }
+      vscp_makeLower(str);
+      if (std::string::npos != str.find("off")) {
+        m_consoleLogLevel = spdlog::level::off;
+      }
+      else if (std::string::npos != str.find("critical")) {
+        m_consoleLogLevel = spdlog::level::critical;
+      }
+      else if (std::string::npos != str.find("err")) {
+        m_consoleLogLevel = spdlog::level::err;
+      }
+      else if (std::string::npos != str.find("warn")) {
+        m_consoleLogLevel = spdlog::level::warn;
+      }
+      else if (std::string::npos != str.find("info")) {
+        m_consoleLogLevel = spdlog::level::info;
+      }
+      else if (std::string::npos != str.find("debug")) {
+        m_consoleLogLevel = spdlog::level::debug;
+      }
+      else if (std::string::npos != str.find("trace")) {
+        m_consoleLogLevel = spdlog::level::trace;
+      }
+      else {
+        spdlog::error(
+          "ReadConfig: LOGGING 'console-log-level' has invalid value "
+          "[{}]. Default value used.",
+          str);
+      }
+    }
+    else {
+      spdlog::error("ReadConfig: Failed to read LOGGING 'console-log-level' "
+                    "Defaults will be used.");
+    }
+
+    // Logging: console-pattern
+    if (j.contains("console-pattern")) {
+      try {
+        m_consoleLogPattern = j["console-pattern"].get<std::string>();
+      }
+      catch (const std::exception& ex) {
+        spdlog::error("ReadConfig:Failed to read 'console-pattern' Error='{}'",
+                      ex.what());
+      }
+      catch (...) {
+        spdlog::error(
+          "ReadConfig:Failed to read 'console-pattern' due to unknown error.");
+      }
+    }
+    else {
+      spdlog::debug("ReadConfig: Failed to read LOGGING 'console-pattern' "
+                    "Defaults will be used.");
+    }
+
   } // Logging
   else {
-    spdlog::error("ReadConfig: No logging has been setup.");
+    spdlog::info("ReadConfig: No logging has been setup.");
   }
 
   ///////////////////////////////////////////////////////////////////////////
@@ -629,6 +753,7 @@ CLog::doLoadConfig(void)
 
   // Console log
   auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+
   if (m_bConsoleLogEnable) {
     console_sink->set_level(m_consoleLogLevel);
     console_sink->set_pattern(m_consoleLogPattern);
@@ -638,9 +763,6 @@ CLog::doLoadConfig(void)
     console_sink->set_level(spdlog::level::off);
   }
 
-  // auto rotating =
-  // std::make_shared<spdlog::sinks::rotating_file_sink_mt>("log_filename",
-  // 1024*1024, 5, false);
   auto rotating_file_sink =
     std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
       m_path_to_log_file.c_str(),
@@ -663,9 +785,19 @@ CLog::doLoadConfig(void)
     sinks.end(),
     spdlog::thread_pool(),
     spdlog::async_overflow_policy::block);
-  // The separate sub loggers will handle trace levels
-  logger->set_level(spdlog::level::trace);
   spdlog::register_logger(logger);
+  spdlog::set_default_logger(logger);
+
+  // logger->set_level(m_logLevel);
+
+  if (m_bDebug) {
+    spdlog::debug("trace.");
+    spdlog::debug("debug.");
+    spdlog::info("info.");
+    spdlog::warn("warn.");
+    spdlog::error("error.");
+    spdlog::critical("critical.");
+  }
 
   // ------------------------------------------------------------------------
 
@@ -731,7 +863,8 @@ CLog::handleHLO(vscpEvent* pEvent)
 
   // Check pointers
   if (NULL == pEvent->pdata) {
-    spdlog::error("[vscpl2drv-logger] HLO parser: HLO in-buffer pointer is NULL.");
+    spdlog::error(
+      "[vscpl2drv-logger] HLO parser: HLO in-buffer pointer is NULL.");
     return false;
   }
 
@@ -770,7 +903,8 @@ CLog::handleHLO(vscpEvent* pEvent)
 
   // Get op
   if (!j["op"].is_string()) {
-    spdlog::error("[vscpl2drv-logger] HLO parser: No operation specified (not string).");
+    spdlog::error(
+      "[vscpl2drv-logger] HLO parser: No operation specified (not string).");
     return false;
   }
 
@@ -1020,7 +1154,7 @@ CLog::handleHLO(vscpEvent* pEvent)
       if (doSaveConfig()) {
         if (m_bDebug) {
           spdlog::error("[vscpl2drv-logger] HLO_OP_SAVE - Saving "
-                 "configuration. Success.");
+                        "configuration. Success.");
         }
         // OK
         j_rply["op"] = "save";
@@ -1028,9 +1162,8 @@ CLog::handleHLO(vscpEvent* pEvent)
       }
       else {
         if (m_bDebug) {
-          spdlog::debug(
-                 "[vscpl2drv-logger] HLO_OP_SAVE - Saving "
-                 "configuration. Failure.");
+          spdlog::debug("[vscpl2drv-logger] HLO_OP_SAVE - Saving "
+                        "configuration. Failure.");
         }
         // ERROR
         j_rply["op"]   = "save";
@@ -1041,11 +1174,10 @@ CLog::handleHLO(vscpEvent* pEvent)
   }
   // ------------------------------------------------------------------------
   else if ("load" == hlo_op) {
-    if (doLoadConfig()) {
+    if (doLoadConfig(m_pathConfigFile)) {
       if (m_bDebug) {
-        spdlog::debug(
-               "[vscpl2drv-logger] HLO_OP_LOAD - Saving "
-               "configuration. Success.");
+        spdlog::debug("[vscpl2drv-logger] HLO_OP_LOAD - Saving "
+                      "configuration. Success.");
       }
       // OK
       j_rply["op"]   = "load";
@@ -1054,9 +1186,8 @@ CLog::handleHLO(vscpEvent* pEvent)
     }
     else {
       if (m_bDebug) {
-        spdlog::debug(
-               "[vscpl2drv-logger] HLO_OP_LOAD - Loading "
-               "configuration. Failure.");
+        spdlog::debug("[vscpl2drv-logger] HLO_OP_LOAD - Loading "
+                      "configuration. Failure.");
       }
       // ERROR
       j_rply["op"]   = "load";
@@ -1069,21 +1200,19 @@ CLog::handleHLO(vscpEvent* pEvent)
     if (!m_logStream.is_open()) {
       if (openLogFile()) {
         if (m_bDebug) {
-          spdlog::debug(
-                 "[vscpl2drv-logger] HLO-CMD OPEN - Opening logfile "
-                 "[%s][%s] .",
-                 m_pathLogFile.c_str(),
-                 (m_logStream.is_open() ? "open" : "closed"));
+          spdlog::debug("[vscpl2drv-logger] HLO-CMD OPEN - Opening logfile "
+                        "[%s][%s] .",
+                        m_pathLogFile.c_str(),
+                        (m_logStream.is_open() ? "open" : "closed"));
         }
         // OK
         j_rply["op"] = "open";
         j_rply["rv"] = VSCP_ERROR_SUCCESS;
       }
       else {
-        spdlog::error(
-               "[vscpl2drv-logger] HLO-CMD OPEN - Failed to "
-               "open logfile [%s].",
-               m_pathLogFile.c_str());
+        spdlog::error("[vscpl2drv-logger] HLO-CMD OPEN - Failed to "
+                      "open logfile [%s].",
+                      m_pathLogFile.c_str());
         // ERROR
         j_rply["op"] = "open";
         j_rply["rv"] = VSCP_ERROR_ERROR;
@@ -1092,10 +1221,9 @@ CLog::handleHLO(vscpEvent* pEvent)
       }
     }
     else {
-      spdlog::error(
-             "[vscpl2drv-logger] HLO-CMD OPEN - logfile "
-             "already open [%s].",
-             m_pathLogFile.c_str());
+      spdlog::error("[vscpl2drv-logger] HLO-CMD OPEN - logfile "
+                    "already open [%s].",
+                    m_pathLogFile.c_str());
       // ERROR
       j_rply["op"] = "open";
       j_rply["rv"] = VSCP_ERROR_ERROR;
@@ -1106,11 +1234,10 @@ CLog::handleHLO(vscpEvent* pEvent)
   // ------------------------------------------------------------------------
   else if ("close" == hlo_op) {
     if (m_bDebug) {
-      spdlog::error(
-             "[vscpl2drv-logger] HLO-CMD CLOSE - Closing "
-             "logfile [%s][%s] .",
-             m_pathLogFile.c_str(),
-             (m_logStream.is_open() ? "open" : "closed"));
+      spdlog::error("[vscpl2drv-logger] HLO-CMD CLOSE - Closing "
+                    "logfile [%s][%s] .",
+                    m_pathLogFile.c_str(),
+                    (m_logStream.is_open() ? "open" : "closed"));
     }
 
     if (m_logStream.is_open()) {
@@ -1124,11 +1251,10 @@ CLog::handleHLO(vscpEvent* pEvent)
   else {
     // Unknow command
     if (m_bDebug) {
-      spdlog::error(
-             "[vscpl2drv-logger] HLO-CMD unknown command "
-             "logfile [%s][%s] .",
-             hlo_op.c_str(),
-             m_pathLogFile.c_str());
+      spdlog::error("[vscpl2drv-logger] HLO-CMD unknown command "
+                    "logfile [%s][%s] .",
+                    hlo_op.c_str(),
+                    m_pathLogFile.c_str());
     }
     // ERROR
     j_rply["op"] = hlo_op;
@@ -1197,8 +1323,7 @@ CLog::eventExToReceiveQueue(const vscpEventEx& ex)
 {
   vscpEvent* pev = new vscpEvent();
   if (!vscp_convertEventExToEvent(pev, &ex)) {
-    spdlog::error(
-           "[vscpl2drv-logger] Failed to convert event from ex to ev.");
+    spdlog::error("[vscpl2drv-logger] Failed to convert event from ex to ev.");
     vscp_deleteEvent(pev);
     return false;
   }
@@ -1300,16 +1425,14 @@ CLog::openLogFile(void)
 
       m_logStream.open(m_pathLogFile, std::ios::out | std::ios::trunc);
       if (!m_logStream.is_open()) {
-        spdlog::error(
-               "[vscpl2drv-logger] Failed to open log file [%s].",
-               m_pathLogFile.c_str());
+        spdlog::error("[vscpl2drv-logger] Failed to open log file [%s].",
+                      m_pathLogFile.c_str());
         return false;
       }
 
       if (m_bDebug) {
-        spdlog::debug(
-               "Successfully opened logfile [%s]",
-               m_pathLogFile.c_str());
+        spdlog::debug("Successfully opened logfile [%s]",
+                      m_pathLogFile.c_str());
       }
 
       switch (m_logFmt) {
@@ -1330,16 +1453,14 @@ CLog::openLogFile(void)
 
       m_logStream.open(m_pathLogFile, std::ios::out | std::ios::app);
       if (!m_logStream.is_open()) {
-        spdlog::error(
-               "[vscpl2drv-logger] Failed to open log file [%s].",
-               m_pathLogFile.c_str());
+        spdlog::error("[vscpl2drv-logger] Failed to open log file [%s].",
+                      m_pathLogFile.c_str());
         return false;
       }
 
       if (m_bDebug) {
-        spdlog::debug(
-               "Successfully opened logfile [%s]",
-               m_pathLogFile.c_str());
+        spdlog::debug("Successfully opened logfile [%s]",
+                      m_pathLogFile.c_str());
       }
     }
   }
@@ -1491,8 +1612,8 @@ threadWorker(void* pData)
   CLog* pLog = (CLog*)pData;
   if (NULL == pLog) {
     spdlog::error(
-           "[vscpl2drv-logger] No thread object supplied to worker thread. "
-           "Aborting!");
+      "[vscpl2drv-logger] No thread object supplied to worker thread. "
+      "Aborting!");
     return NULL;
   }
 
@@ -1561,7 +1682,7 @@ threadWorker(void* pData)
       vscp_deleteEvent_v2(&pEvent);
       pEvent = NULL;
     } // Event received
-  }   // Receive loop
+  } // Receive loop
 
   return NULL;
 }
