@@ -34,6 +34,13 @@
 #include <list>
 #include <string>
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <pthread.h>
+#include <semaphore.h>
+#endif
+
 #include "spdlog/spdlog.h"
 #include "spdlog/sinks/rotating_file_sink.h"
 
@@ -231,16 +238,25 @@ class CLog
     std::list<vscpEvent*> m_sendList;
     std::list<vscpEvent*> m_receiveList;
 
-    /*!
+    /*
       Event object to indicate that there is an event in the
       output queue
     */
+#ifdef _WIN32
+    HANDLE m_semSendQueue;
+    HANDLE m_semReceiveQueue;
+
+    // Mutex to protect the output queue
+    HANDLE m_mutexSendQueue;
+    HANDLE m_mutexReceiveQueue;
+#else
     sem_t m_semSendQueue;
     sem_t m_semReceiveQueue;
 
     // Mutex to protect the output queue
     pthread_mutex_t m_mutexSendQueue;
     pthread_mutex_t m_mutexReceiveQueue;
+#endif
 };
 
 

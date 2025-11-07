@@ -96,11 +96,19 @@ CLog::CLog()
   vscp_clearVSCPFilter(&m_filterIn);  // No used
   vscp_clearVSCPFilter(&m_filterOut); // Sent from interface
 
+#ifdef _WIN32
+  m_semSendQueue = CreateSemaphore(NULL, 0, LONG_MAX, NULL);
+  m_semReceiveQueue = CreateSemaphore(NULL, 0, LONG_MAX, NULL);
+
+  m_mutexSendQueue = CreateMutex(NULL, FALSE, NULL);
+  m_mutexReceiveQueue = CreateMutex(NULL, FALSE, NULL);
+#else
   sem_init(&m_semSendQueue, 0, 0);
   sem_init(&m_semReceiveQueue, 0, 0);
 
   pthread_mutex_init(&m_mutexSendQueue, NULL);
   pthread_mutex_init(&m_mutexReceiveQueue, NULL);
+#endif
 
   // Init pool
   spdlog::init_thread_pool(8192, 1);
@@ -138,11 +146,19 @@ CLog::~CLog()
 
   close();
 
+#ifdef _WIN32
+  CloseHandle(m_mutexSendQueue);
+  CloseHandle(m_mutexReceiveQueue);
+
+  CloseHandle(m_semSendQueue);
+  CloseHandle(m_semReceiveQueue);
+#else
   pthread_mutex_destroy(&m_mutexSendQueue);
   pthread_mutex_destroy(&m_mutexReceiveQueue);
 
   sem_destroy(&m_semSendQueue);
   sem_destroy(&m_semReceiveQueue);
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -1183,10 +1199,17 @@ CLog::eventExToReceiveQueue(const vscpEventEx& ex)
   }
 
   if (NULL != pev) {
+#ifdef _WIN32
+    WaitForSingleObject(m_mutexReceiveQueue, INFINITE);
+    m_receiveList.push_back(pev);
+    ReleaseSemaphore(m_semReceiveQueue, 1, NULL);
+    ReleaseMutex(m_mutexReceiveQueue);
+#else
     pthread_mutex_lock(&m_mutexReceiveQueue);
     m_receiveList.push_back(pev);
     sem_post(&m_semReceiveQueue);
     pthread_mutex_unlock(&m_mutexReceiveQueue);
+#endif
   }
   else {
     spdlog::error("[vscpl2drv-logger] Unable to allocate event storage.");
@@ -1213,10 +1236,17 @@ CLog::addEvent2SendQueue(const vscpEvent* pEvent)
     return false;
   }
 
+#ifdef _WIN32
+  WaitForSingleObject(m_mutexSendQueue, INFINITE);
+  m_sendList.push_back((vscpEvent*)pev);
+  ReleaseSemaphore(m_semSendQueue, 1, NULL);
+  ReleaseMutex(m_mutexSendQueue);
+#else
   pthread_mutex_lock(&m_mutexSendQueue);
   m_sendList.push_back((vscpEvent*)pev);
   sem_post(&m_semSendQueue);
   pthread_mutex_unlock(&m_mutexSendQueue);
+#endif
 
   return true;
 }
@@ -1239,10 +1269,17 @@ CLog::addEvent2ReceiveQueue(const vscpEvent* pEvent)
     return false;
   }
 
+#ifdef _WIN32
+  WaitForSingleObject(m_mutexReceiveQueue, INFINITE);
+  m_receiveList.push_back((vscpEvent*)pEvent);
+  ReleaseSemaphore(m_semReceiveQueue, 1, NULL);
+  ReleaseMutex(m_mutexReceiveQueue);
+#else
   pthread_mutex_lock(&m_mutexReceiveQueue);
   m_receiveList.push_back((vscpEvent*)pEvent);
   sem_post(&m_semReceiveQueue);
   pthread_mutex_unlock(&m_mutexReceiveQueue);
+#endif
   return true;
 }
 
@@ -1463,7 +1500,11 @@ threadWorker(void* pData)
   while (!pLog->m_bQuit) {
     // Wait for events
     int rv;
+#ifdef _WIN32
     if (-1 == (rv = vscp_sem_wait(&pLog->m_semSendQueue, 500))) {
+#else
+    if (-1 == (rv = vscp_sem_wait(&pLog->m_semSendQueue, 500))) {
+#endif
       if (ETIMEDOUT == errno) {
         continue;
       }
@@ -1486,10 +1527,17 @@ threadWorker(void* pData)
     }
 
     if (pLog->m_sendList.size()) {
+#ifdef _WIN32
+      WaitForSingleObject(pLog->m_mutexSendQueue, INFINITE);
+      vscpEvent* pEvent = pLog->m_sendList.front();
+      pLog->m_sendList.pop_front();
+      ReleaseMutex(pLog->m_mutexSendQueue);
+#else
       pthread_mutex_lock(&pLog->m_mutexSendQueue);
       vscpEvent* pEvent = pLog->m_sendList.front();
       pLog->m_sendList.pop_front();
       pthread_mutex_unlock(&pLog->m_mutexSendQueue);
+#endif
 
       if (NULL == pEvent) {
         continue;
