@@ -28,28 +28,50 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#ifndef _WIN32
 #include <unistd.h>
 #include <syslog.h>
+#include <pthread.h>
+#else
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
 
 #include "version.h"
 #include "vscpl2drv-logger.h"
 #include <canal-macro.h>
 #include <log.h>
 
+#ifndef _WIN32
 void _init() __attribute__((constructor));
 void _fini() __attribute__((destructor));
+#else
+// On Windows, these will be called from DllMain
+void _init();
+void _fini();
+#endif
 
 // This map holds driver handles/objects
 static std::map<long, CLog *> g_ifMap;
 
 // Mutex for the map object
+#ifdef _WIN32
+static HANDLE g_mapMutex;
+#else
 static pthread_mutex_t g_mapMutex;
+#endif
 
 ////////////////////////////////////////////////////////////////////////////
 // DLL constructor
 //
 
-void _init() { pthread_mutex_init(&g_mapMutex, NULL); }
+void _init() { 
+#ifdef _WIN32
+  g_mapMutex = CreateMutex(NULL, FALSE, NULL);
+#else
+  pthread_mutex_init(&g_mapMutex, NULL);
+#endif
+}
 
 ////////////////////////////////////////////////////////////////////////////
 // DLL destructor
@@ -78,8 +100,32 @@ void _fini() {
   g_ifMap.clear(); // Remove all items
 
   UNLOCK_MUTEX(g_mapMutex);
+#ifdef _WIN32
+  CloseHandle(g_mapMutex);
+#else
   pthread_mutex_destroy(&g_mapMutex);
+#endif
 }
+
+#ifdef _WIN32
+///////////////////////////////////////////////////////////////////////////////
+// DllMain - Windows DLL entry point
+//
+
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
+  switch (ul_reason_for_call) {
+    case DLL_PROCESS_ATTACH:
+      _init();
+      break;
+    case DLL_PROCESS_DETACH:
+      _fini();
+      break;
+    default:
+      break;
+  }
+  return TRUE;
+}
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 // addDriverObject
@@ -227,19 +273,22 @@ extern "C" int VSCPRead(long handle, vscpEvent *pEvent, unsigned long timeout) {
   if (-1 == (rv = vscp_sem_wait(&pdrvObj->m_semReceiveQueue, timeout))) {
     if (ETIMEDOUT == errno) {
       return CANAL_ERROR_TIMEOUT;
-    } else if (EINTR == errno) {
-      syslog(LOG_ERR, "[vscpl2drv-logger] Interrupted by a signal handler");
+    }
+#ifndef _WIN32
+    else if (EINTR == errno) {
+      SYSLOG(LOG_ERR, "[vscpl2drv-logger] Interrupted by a signal handler");
       return CANAL_ERROR_INTERNAL;
     } else if (EINVAL == errno) {
-      syslog(LOG_ERR, "[vscpl2drv-logger] Invalid semaphore (timout)");
+      SYSLOG(LOG_ERR, "[vscpl2drv-logger] Invalid semaphore (timout)");
       return CANAL_ERROR_INTERNAL;
     } else if (EAGAIN == errno) {
-      syslog(LOG_ERR, "[vscpl2drv-logger] Blocking error");
+      SYSLOG(LOG_ERR, "[vscpl2drv-logger] Blocking error");
       return CANAL_ERROR_INTERNAL;
     } else {
-      syslog(LOG_ERR, "[vscpl2drv-logger] Unknown error");
+      SYSLOG(LOG_ERR, "[vscpl2drv-logger] Unknown error");
       return CANAL_ERROR_INTERNAL;
     }
+#endif
   }
 
   pthread_mutex_lock(&pdrvObj->m_mutexReceiveQueue);

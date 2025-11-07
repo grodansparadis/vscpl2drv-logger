@@ -28,10 +28,14 @@
 #include <string>
 
 #include <limits.h>
+#ifndef _WIN32
 #include <pthread.h>
 #include <semaphore.h>
+#endif
 #include <stdlib.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 
 //#include <expat.h>
 #include <vscpbase64.h>
