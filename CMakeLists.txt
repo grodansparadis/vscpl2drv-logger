@@ -64,7 +64,7 @@ function(parse_version_header version_file)
         string(REGEX MATCH "#define[ \t]+VSCPL2DRV_LOGGER_BUILD_VERSION[ \t]+([0-9]+)" 
                BUILD_MATCH "${VERSION_HEADER_CONTENT}")
         if(BUILD_MATCH)
-            string(REGEX REPLACE "#define[ \t]+BUILD_VERSION[ \t]+([0-9]+)" "\\1" 
+            string(REGEX REPLACE "#define[ \t]+VSCPL2DRV_LOGGER_BUILD_VERSION[ \t]+([0-9]+)" "\\1" 
                    PARSED_BUILD_VERSION "${BUILD_MATCH}")
             set(BUILD_VERSION ${PARSED_BUILD_VERSION} PARENT_SCOPE)
         endif()
@@ -97,19 +97,22 @@ endif()
 
 # Disable abi warnings (nlohmann)
 if(WIN32)
-add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-add_definitions(-D_WINSOCK_DEPRECATED_NO_WARNINGS)
-# Ensure WIN32 is defined for the preprocessor
-add_definitions(-DWIN32)
-add_definitions(-D_WIN32)
-# Add UTF-8 support for spdlog/fmt
-  add_compile_options(/utf-8)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+    add_definitions(-D_WINSOCK_DEPRECATED_NO_WARNINGS)
+    # Ensure WIN32 is defined for the preprocessor
+    add_definitions(-DWIN32)
+    add_definitions(-D_WIN32)
+    # Add UTF-8 support for spdlog/fmt
+    add_compile_options(/utf-8)
+    # Enable exception handling for MSVC
+    add_compile_options(/EHsc)
 else()
-SET(GCC_VSCP_COMPILE_FLAGS "-Wno-psabi -D WITH_SYSTEMD")
+    # GCC/Clang-specific flags for non-Windows platforms
+    SET(GCC_VSCP_COMPILE_FLAGS "-Wno-psabi")
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        SET(GCC_VSCP_COMPILE_FLAGS "${GCC_VSCP_COMPILE_FLAGS} -D WITH_SYSTEMD")
+    endif()
 endif()
-
-# Prevent abi warnings in nlohmann
-SET(GCC_VSCP_COMPILE_FLAGS "-Wno-psabi")
 # Profiling
 #SET(GCC_VSCP_LINK_FLAGS    "-lgcov")
 
@@ -236,9 +239,12 @@ IF(EXISTS "${CMAKE_ROOT}/Modules/CPack.cmake")
 
 ENDIF(EXISTS "${CMAKE_ROOT}/Modules/CPack.cmake")
 
-# Disable abi warnings (nlohmann)
-SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_VSCP_COMPILE_FLAGS}")
-SET(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} ${GCC_VSCP_LINK_FLAGS}")
+# Apply compiler flags based on platform
+if(NOT WIN32)
+    # Apply GCC/Clang-specific flags for non-Windows platforms
+    SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_VSCP_COMPILE_FLAGS}")
+    SET(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} ${GCC_VSCP_LINK_FLAGS}")
+endif()
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
