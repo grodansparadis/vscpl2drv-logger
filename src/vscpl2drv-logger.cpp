@@ -40,7 +40,7 @@
 #include "version.h"
 #include "vscpl2drv-logger.h"
 #include <canal-macro.h>
-#include <log.h>
+#include "../common/log.h"
 
 #ifndef _WIN32
 void _init() __attribute__((constructor));
