@@ -89,6 +89,13 @@ endif()
 
 message(STATUS "Final version: ${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}.${BUILD_VERSION}")
 
+# Generate version header from template
+configure_file(
+    ${CMAKE_SOURCE_DIR}/cmake/version.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/version_generated.h
+    @ONLY
+)
+
 # Force UTF-8 encoding for MSVC to fix spdlog/fmt Unicode issues
 if(MSVC)
     add_compile_options(/utf-8)
@@ -230,11 +237,13 @@ IF(EXISTS "${CMAKE_ROOT}/Modules/CPack.cmake")
 
   SET(CPACK_COMPONENTS_ALL Libraries ApplicationData)
 
-  # Configure file with custom definitions for NSIS.
-  configure_file(
-    ${PROJECT_SOURCE_DIR}/resources/nsis/NSIS.definitions.nsh.in
-    ${CMAKE_CURRENT_BINARY_DIR}/resources/nsis/NSIS.definitions.nsh
-  )
+  # Configure file with custom definitions for NSIS (Windows only).
+  IF(WIN32)
+    configure_file(
+      ${PROJECT_SOURCE_DIR}/resources/nsis/NSIS.definitions.nsh.in
+      ${CMAKE_CURRENT_BINARY_DIR}/resources/nsis/NSIS.definitions.nsh
+    )
+  ENDIF()
 
   # Load packaging facilities.
   INCLUDE(CPack)
