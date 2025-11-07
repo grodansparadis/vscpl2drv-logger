@@ -2,7 +2,7 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "build vscpl2drv-websocksrv",
+            "label": "build vscpl2drv-logger",
             "type": "shell",
             "windows": {
                 "command": ".\\build-windows.bat"
@@ -20,7 +20,7 @@
             "problemMatcher": ["$msCompile", "$gcc"]
         },
         {
-            "label": "clean & build vscpl2drv-websocksrv",
+            "label": "clean & build vscpl2drv-logger",
             "type": "shell",
             "windows": {
                 "command": "powershell.exe",

@@ -21,6 +21,11 @@
 // Boston, MA 02111-1307, USA.
 //
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 #include <deque>
 #include <fstream>
 #include <iostream>
@@ -1133,7 +1138,7 @@ CLog::handleHLO(vscpEvent* pEvent)
   std::string rply = j_rply.dump();
 
   memset(ex.data, 0, sizeof(ex.data));
-  ex.sizeData = 17 + rply.length();
+  ex.sizeData = 17 + (uint16_t)rply.length();
   if (ex.sizeData > (VSCP_LEVEL2_MAXDATA - 17)) {
     spdlog::error(
       "[vscpl2drv-logger] HLO: Reply data is larger than allowed maximum.");

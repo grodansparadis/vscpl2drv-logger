@@ -98,6 +98,7 @@ endif()
 # Disable abi warnings (nlohmann)
 if(WIN32)
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+    add_definitions(-D_SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING)
     add_definitions(-D_WINSOCK_DEPRECATED_NO_WARNINGS)
     # Ensure WIN32 is defined for the preprocessor
     add_definitions(-DWIN32)
@@ -106,6 +107,7 @@ if(WIN32)
     add_compile_options(/utf-8)
     # Enable exception handling for MSVC
     add_compile_options(/EHsc)
+    message(STATUS "Suppressed stdext::checked_array_iterator deprecation warnings")
 else()
     # GCC/Clang-specific flags for non-Windows platforms
     SET(GCC_VSCP_COMPILE_FLAGS "-Wno-psabi")
@@ -344,6 +346,8 @@ if (WIN32)
     OpenSSL::Crypto
     OpenSSL::SSL OpenSSL::Crypto
     expat::expat
+    ws2_32
+    iphlpapi
   )
         
 else()

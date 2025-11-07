@@ -291,10 +291,10 @@ extern "C" int VSCPRead(long handle, vscpEvent *pEvent, unsigned long timeout) {
 #endif
   }
 
-  pthread_mutex_lock(&pdrvObj->m_mutexReceiveQueue);
+  LOCK_MUTEX(pdrvObj->m_mutexReceiveQueue);
   vscpEvent *pLocalEvent = pdrvObj->m_receiveList.front();
   pdrvObj->m_receiveList.pop_front();
-  pthread_mutex_unlock(&pdrvObj->m_mutexReceiveQueue);
+  UNLOCK_MUTEX(pdrvObj->m_mutexReceiveQueue);
   if (NULL == pLocalEvent)
     return CANAL_ERROR_MEMORY;
 

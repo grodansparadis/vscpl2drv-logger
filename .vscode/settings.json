@@ -77,5 +77,10 @@
         "variant": "cpp",
         "bit": "cpp"
     },
-    "idf.pythonInstallPath": "/home/akhe/.platformio/penv/bin/python"
+    "idf.pythonInstallPath": "/home/akhe/.platformio/penv/bin/python",
+    "cmake.configureArgs": [
+        "-A",
+        "x64"
+    ],
+    "cmake.generator": "Visual Studio 17 2022"
 }
