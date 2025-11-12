@@ -4,7 +4,7 @@
 **Document version:** ${/var/document-version} - ${/var/creation-time}
 [HISTORY](./history.md)
 
-![driver model](/images/xmap-vscpl2drv-logger.png)
+![driver model](images/xmap-vscpl2drv-logger.png)
 
 VSCP level II driver for diagnostic logging. It makes it possible to log VSCP events from one or several sources to a file. Three formats of the log file is currently supported
 
