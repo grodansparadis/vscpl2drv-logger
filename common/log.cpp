@@ -42,7 +42,6 @@
 #include <unistd.h>
 #endif
 
-// #include <expat.h>
 #include <vscpbase64.h>
 
 #include <hlo.h>

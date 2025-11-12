@@ -1,7 +1,7 @@
 ## Install the driver on Linux
 You can install the driver using the debian package with
 
-> sudo apt install ./vscpl2drv-websocksrv.y.z.deb
+> sudo apt install ./vscpl2drv-logger.y.z.deb
 
 the driver will be installed to /var/lib/vscp/drivers/level2
 
@@ -15,12 +15,12 @@ You also need to set up a configuration file for the driver itself. If you don't
 
 If you need to do dynamic configuration a good place to put the file is in the */var/vscp/lib/vscp/vscpd/* folder or maybe a subfolder here. Make sure the _vscp_ user can read/write the location.
 
-A sample configuration file is make available in */usr/share/vscpl2drv-websocksrv.so* after installation.
+A sample configuration file is make available in */usr/share/vscpl2drv-logger.so* after installation.
 
 ## Install the driver on Windows
 In the release section of this site you can find binary files for windows that will install the file for you or unpack a binary that you can copy to the location of choice yourself.
 
 ## Install the driver on MacOS
-t.b.d.
+In the release section of this site you can find binary files for macOS that will install the file for you or unpack a binary that you can copy to the location of choice yourself.
 
 [filename](./bottom-copyright.md ':include')

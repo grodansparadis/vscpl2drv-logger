@@ -2,33 +2,7 @@
 
 ![](./images/widgets.png)
 
-A typical use of vscpl2drv-websocksrv is when you want to visualize data from a VSCP node. By using the websocket interface you can publish live data on a web page with ease and the lowest possible resource overhead. The data can come from nodes connected to the network in different ways. One common way to retrieve data is through the event flow on a MQTT server as the VSCP daemon can publish data this way. Events on the MQTT subscribed topics will be received over the open websocket channel and is ready for display. Events sent using the websocket interface will be published on the configured publish topics and the functionality can be used for command button interactions etc.
-
-Connected nodes may use a websocket interface to interface the world. In this case the driver can be used as the middleware between the VSCP network and the websocket connected nodes. A host can use the websocket driver to connect to such a node in a secure way.
-
-## Testing ws1 in a web browser
-
-![](./images/ws1-web-client.png)
-
-There is a sample web client for testing the ws1 protocol in a web browser. The client is available [here](https://github.com/grodansparadis/vscpl2drv-websocksrv/blob/main/test/test_ws1.html).
-
-A demo server is also available for testing [here](wss://vscp1.vscp.org:8884). Note that this is a public server and that data sent here may be visible to others. Username and password for the demo server is _admin/secret_ and default key.
-
-### C, Python, node.js sample clients
-
-In the same folder you can also find C, Python and node.js sample clients for testing the ws1 protocol.
-
-## Testing ws2 in a web browser
-
-![](./images/ws2-web-client.png)
-
-There is a sample web client for testing the ws2 protocol in a web browser. The client is available [here](https://github.com/grodansparadis/vscpl2drv-websocksrv/blob/main/test/test_ws2.html).
-
-A demo server is also available for testing [here](wss://vscp1.vscp.org:8884). Note that this is a public server and that data sent here may be visible to others. Username and password for the demo server is _admin/secret_ and default key.
-
-### C, Python, node.js sample clients 
-
-In the same folder you can also find C, Python and node.js sample clients for testing the ws2 protocol.
+A typical use of vscpl2drv-logger is when you want to log data from a VSCP node or a range of nodes on a VSCP network. Normally you do this for debugging purposes or to monitor the network for certain events.
 
 ## Make your own application that interface the level II driver
 
@@ -36,9 +10,9 @@ It is very easy to interface VSCP Level II drivers from other software. Full inf
 
 Easiest is of course to link to the driver shared library from your own application. You can also load the driver manually at runtime if you want to be able to load different drivers without recompiling your application. The interface header is available [here](https://github.com/grodansparadis/vscp/blob/master/src/vscp/common/level2drvdef.h)
 
-For manual linking there is a simple test application that can be used to test the websocket driver (or all level II drivers). The application is available in the [testapp](https://github.com/grodansparadis/vscpl2drv-websocksrv/tree/main/testapp) of the project.
+For manual linking there is a simple test application that can be used to test the websocket driver (or all level II drivers). The application is available in the [testapp](https://github.com/grodansparadis/vscpl2drv-logger/tree/master/testapp) of the project.
 
-This driver have hard coded credentials and paths so you need to edit it before use. All of them are defined in the beginning of the file.
+This driver have hard coded configuration paths so you need to edit it before use. You find them in the beginning of the file.
 
 The `testapp` loads and finds the methods of the driver manually so it is a good example of how to interface level II drivers from your own software. It will send a VSCP event every second and print any received events to the console. It should work on all supported platforms.
 
@@ -51,10 +25,10 @@ Add the following to the level II section of the VSCP daemon configuration file
 ``` json
 {
   "enable" : true,
-  "name" : "websocket-srv",
-  "path-driver" : "/var/lib/vscp/drivers/level2/libvscpl2drv-websocksrv.so",
-  "path-config" : "/etc/vscp/websocksrv.json",
-  "guid" : "FF:FF:FF:FF:FF:FF:FF:F5:02:88:88:00:00:00:00:01",
+  "name" : "logger-srv",
+  "path-driver" : "/var/lib/vscp/drivers/level2/libvscpl2drv-logger.so",
+  "path-config" : "/etc/vscp/logger.json",
+  "guid" : "FF:FF:FF:FF:FF:FF:FF:F5:02:88:88:00:00:00:00:02",
 
   "mqtt": {
     "bind": "",
@@ -71,7 +45,7 @@ Add the following to the level II section of the VSCP daemon configuration file
     },
     "user": "vscp",
     "password": "secret",
-    "clientid": "the-vscp-daemon websocksrv driver",
+    "clientid": "the-vscp-daemon logger driver",
     "publish-format": "json",
     "subscribe-format": "auto",
     "qos": 1,
@@ -105,29 +79,21 @@ Add the following to the level II section of the VSCP daemon configuration file
     },
     "subscribe" : [
       {
-        "topic": "vscp/websocksrv/{{guid}}/#",
+        "topic": "vscp/logger/{{guid}}/#",
         "qos": 0,
         "v5-options": 0,
         "format": "auto"
-      }
-    ],
-    "publish" : [
-      {
-        "topic": "vscp/{{guid}}/{{class}}/{{type}}/{{nodeid}}",
-        "qos": 1,
-        "retain": false,
-        "format": "json"
       }
     ]
   }
 }
 ```
 
-Copy _/var/share/vscpl2drv-websocksrv/websocksrv.json_ and _/var/share/vscpl2drv-websocksrv/users.json_ to _/etc/vscp_
+Copy _/var/share/vscpl2drv-logger/logger.json_ and _/var/share/vscpl2drv-logger/users.json_ to _/etc/vscp_
 
 ```bash
-sudo cp /var/share/vscpl2drv-websocksrv/websocksrv.json /etc/vscp
-sudo cp /var/share/vscpl2drv-websocksrv/users.json /etc/vscp
+sudo cp /var/share/vscpl2drv-logger/logger.json /etc/vscp
+sudo cp /var/share/vscpl2drv-logger/users.json /etc/vscp
 ```
 
 Restart the vscp daemon

@@ -2,7 +2,7 @@
 
 ![VSCP logo](./images/logo_100.png)
 
-# Documentation for the vscpl2drv-websocksrv driver
+# Documentation for the vscpl2drv-logger driver
 
 Scroll down to view docs.
 
