@@ -3,6 +3,7 @@
 * [Build the driver from source](./build.md)
 * [Configure the driver](./configure.md)
 * [Test and use the driver](./using.md)
+* [HLO configuration](./hlo.md)
 * [FAQ](./faq.md)
 * [Useful links](./links.md)
 * [Document History](./history.md) 
