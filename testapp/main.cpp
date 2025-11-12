@@ -69,10 +69,15 @@
 
 using namespace std::chrono;
 
+#ifdef WIN32
 static std::string s_strDriverPath      = "/home/akhe/development/VSCP/vscpl2drv-logger/build/libvscpl2drv-logger.so";
 static std::string s_strParameter = "/home/akhe/development/VSCP/vscpl2drv-logger/debug/linux/vscpl2drv-logger.json";
 static cguid s_guid("FF:FF:FF:FF:FF:FF:FF:FE:00:00:00:00:00:00:00:02");
-
+#else
+static std::string s_strDriverPath      = "/home/akhe/development/VSCP/vscpl2drv-logger/build/libvscpl2drv-logger.so";
+static std::string s_strParameter = "/home/akhe/development/VSCP/vscpl2drv-logger/debug/linux/vscpl2drv-logger.json";
+static cguid s_guid("FF:FF:FF:FF:FF:FF:FF:FE:00:00:00:00:00:00:00:02");
+#endif
 // Level II driver methods
 LPFNDLL_VSCPOPEN proc_VSCPOpen;
 LPFNDLL_VSCPCLOSE proc_VSCPClose;
