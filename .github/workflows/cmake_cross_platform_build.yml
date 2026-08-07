@@ -91,7 +91,7 @@ jobs:
 
       - name: Install into staging
         shell: bash
-        run: cmake --install build --config "$BUILD_TYPE" --prefix "$PWD/stage"
+        run: DESTDIR="$PWD/stage" cmake --install build --config "$BUILD_TYPE"
 
       - name: Create packages (Linux/macOS)
         if: runner.os == 'Linux' || runner.os == 'macOS'
