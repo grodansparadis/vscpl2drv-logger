@@ -294,29 +294,29 @@ add_library(vscpl2drv-logger
   ./src/vscpl2drv-logger.cpp
   ./common/log.cpp
   ./common/log.cpp
-  ./third_party/Mustache/mustache.hpp
-  ./third_party/spdlog/include/spdlog/spdlog.h
-  ./third_party/vscp/src/vscp/common/vscp.h
-  ./third_party/vscp/src/vscp/common/vscphelper.h
-  ./third_party/vscp/src/vscp/common/vscphelper.cpp
-  ./third_party/vscp/src/vscp/common/guid.h
-  ./third_party/vscp/src/vscp/common/guid.cpp 
-  ./third_party/vscp/src/vscp/common/vscp.h
-  ./third_party/vscp/src/vscp/common/vscpdatetime.h
-  ./third_party/vscp/src/vscp/common/vscpdatetime.cpp
-  ./third_party/vscp/src/vscp/common/canal.h
-  ./third_party/vscp/src/common/vscpbase64.h
-  ./third_party/vscp/src/common/vscpbase64.c
-  ./third_party/vscp/src/common/vscp-aes.h
-  ./third_party/vscp/src/common/vscp-aes.c
-  ./third_party/vscp/src/common/crc.h
-  ./third_party/vscp/src/common/crc.c
-  ./third_party/vscp/src/common/crc8.h
-  ./third_party/vscp/src/common/crc8.c
-  ./third_party/vscp/src/common/vscpmd5.h
-  ./third_party/vscp/src/common/vscpmd5.c
-  ./third_party/crypto-algorithms/sha256.h
-  ./third_party/crypto-algorithms/sha256.c
+  ./third-party/Mustache/mustache.hpp
+  ./third-party/spdlog/include/spdlog/spdlog.h
+  ./third-party/vscp/src/vscp/common/vscp.h
+  ./third-party/vscp/src/vscp/common/vscphelper.h
+  ./third-party/vscp/src/vscp/common/vscphelper.cpp
+  ./third-party/vscp/src/vscp/common/guid.h
+  ./third-party/vscp/src/vscp/common/guid.cpp 
+  ./third-party/vscp/src/vscp/common/vscp.h
+  ./third-party/vscp/src/vscp/common/vscpdatetime.h
+  ./third-party/vscp/src/vscp/common/vscpdatetime.cpp
+  ./third-party/vscp/src/vscp/common/canal.h
+  ./third-party/vscp/src/common/vscpbase64.h
+  ./third-party/vscp/src/common/vscpbase64.c
+  ./third-party/vscp/src/common/vscp-aes.h
+  ./third-party/vscp/src/common/vscp-aes.c
+  ./third-party/vscp/src/common/crc.h
+  ./third-party/vscp/src/common/crc.c
+  ./third-party/vscp/src/common/crc8.h
+  ./third-party/vscp/src/common/crc8.c
+  ./third-party/vscp/src/common/vscpmd5.h
+  ./third-party/vscp/src/common/vscpmd5.c
+  ./third-party/crypto-algorithms/sha256.h
+  ./third-party/crypto-algorithms/sha256.c
 )
 
 if (WIN32)
@@ -325,12 +325,12 @@ if (WIN32)
   find_path(PTHREAD_INCLUDE_DIR pthread.h)
 
   include_directories( PUBLIC src/
-    ./third_party/vscp/src/vscp/common/  
-    ./third_party/vscp/src/common
-    ./third_party/json/include
-    ./third_party/spdlog/include
-    ./third_party/Mustache
-    ./third_party/maddy/include
+    ./third-party/vscp/src/vscp/common/  
+    ./third-party/vscp/src/common
+    ./third-party/json/include
+    ./third-party/spdlog/include
+    ./third-party/Mustache
+    ./third-party/maddy/include
     ${PThreads4W_INCLUDE_DIR}
     ${CMAKE_BINARY_DIR}
     ${OPENSSL_INCLUDE_DIR}
@@ -338,12 +338,12 @@ if (WIN32)
     ${LOCAL_SYSLOG_INCLUDE} )
 else()
   include_directories( PUBLIC src/
-    ./third_party/vscp/src/vscp/common/  
-    ./third_party/vscp/src/common
-    ./third_party/json/include
-    ./third_party/spdlog/include
-    ./third_party/Mustache
-    ./third_party/maddy/include
+    ./third-party/vscp/src/vscp/common/  
+    ./third-party/vscp/src/common
+    ./third-party/json/include
+    ./third-party/spdlog/include
+    ./third-party/Mustache
+    ./third-party/maddy/include
     ${CMAKE_BINARY_DIR}
     ${OPENSSL_INCLUDE_DIR}
     ${LOCAL_SYSLOG_INCLUDE} )
