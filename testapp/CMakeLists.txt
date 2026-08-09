@@ -66,7 +66,7 @@ else()
 endif()
 
 #openssl
-#find_package(OpenSSL REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 # Expat C library
 if(WIN32)
@@ -133,6 +133,7 @@ else()
     ../third-party/spdlog/include/
     ${CMAKE_BINARY_DIR}
     ${THREAD_INCLUDE_DIR}
+    ${OPENSSL_INCLUDE_DIR}
   )
 endif()  
 
@@ -153,6 +154,8 @@ else()
     m
     dl
     ${EXPAT_LIBRARIES}
+    OpenSSL::SSL
+    OpenSSL::Crypto
   )
   
   # Add threading library
