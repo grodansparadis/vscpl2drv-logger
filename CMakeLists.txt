@@ -193,6 +193,8 @@ elseif(UNIX)
   if(APPLE)
     # Suppress deprecation warnings for semaphore functions on macOS
     add_compile_options(-Wno-deprecated-declarations)
+    # Provide a Linux-compatible byteswap.h shim for macOS
+    include_directories(BEFORE ${CMAKE_SOURCE_DIR}/cmake/macos)
   endif()
 endif()
 
