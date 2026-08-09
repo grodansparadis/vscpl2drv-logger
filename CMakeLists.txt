@@ -147,6 +147,11 @@ if(NOT DEFINED APP_VERSION)
   set(APP_VERSION, "${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}")
 endif()
 
+# Provide a Linux-compatible byteswap.h shim for macOS (must be before any add_subdirectory)
+if(APPLE)
+  include_directories(BEFORE ${CMAKE_SOURCE_DIR}/cmake/macos)
+endif()
+
 # Test application
 add_subdirectory(testapp)
 
@@ -193,8 +198,6 @@ elseif(UNIX)
   if(APPLE)
     # Suppress deprecation warnings for semaphore functions on macOS
     add_compile_options(-Wno-deprecated-declarations)
-    # Provide a Linux-compatible byteswap.h shim for macOS
-    include_directories(BEFORE ${CMAKE_SOURCE_DIR}/cmake/macos)
   endif()
 endif()
 
