@@ -20,7 +20,7 @@ jobs:
             os: ubuntu-latest
             cpack_generators: "TGZ;DEB"
           - name: windows
-            os: windows-latest
+            os: windows-2022
             cpack_generators: "ZIP;NSIS"
           - name: macos
             os: macos-latest
