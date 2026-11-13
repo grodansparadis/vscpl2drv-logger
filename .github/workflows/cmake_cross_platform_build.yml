@@ -111,6 +111,22 @@ jobs:
             cpack --config build/CPackConfig.cmake -G $gen
           }
 
+      - name: Write SHA256SUMS
+        id: sha256sums_115
+        continue-on-error: true
+        shell: bash
+        run: |
+          bash .github/scripts/write-sha256sums.sh "SHA256SUMS-vscpl2drv-logger-${{ matrix.name }}" <<'SHA256SUMS_PATTERNS'
+          stage/**
+          *.deb
+          *.rpm
+          *.tar.gz
+          *.tgz
+          *.zip
+          *.exe
+          *.dmg
+          SHA256SUMS_PATTERNS
+
       - name: Upload install artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -124,5 +140,6 @@ jobs:
             *.zip
             *.exe
             *.dmg
+            ${{ steps.sha256sums_115.outputs.file }}
           if-no-files-found: error
           retention-days: 30
