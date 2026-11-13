@@ -1,7 +1,7 @@
 ## Build from source on Linux
 
 ```bash
-git clone --recurse-submodules -j4 https://github.com/grodansparadis/vscpl2drv-logger.git
+git clone https://github.com/grodansparadis/vscpl2drv-logger.git
 sudo apt install pandoc           (comment: *optional*)
 sudo apt install build-essential
 sudo apt install cmake

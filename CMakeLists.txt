@@ -22,11 +22,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 #
-# VSCP_PATH - set to path to local vscp repository. Default is "../vscp". Set with
-# -DVSCP_PATH="path"
+# The VSCP sources and other third-party code are downloaded with FetchContent
+# (see cmake/dependencies.cmake). To build against a local vscp checkout, set
+# -DFETCHCONTENT_SOURCE_DIR_TP_VSCP="path".
 #
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.16)
 
 # Parse version from header file first
 function(parse_version_header version_file)
@@ -79,6 +80,9 @@ endfunction()
 parse_version_header("${CMAKE_CURRENT_SOURCE_DIR}/src/version.h")
 
 project(vscpl2drv-logger VERSION ${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION} LANGUAGES CXX C)
+
+# Third-party sources (formerly git submodules)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/dependencies.cmake)
 set(PACKAGE_AUTHOR "Ake Hedman, the VSCP Project")
 
 # BUILD_VERSION from version.h (if not already set)
@@ -299,29 +303,29 @@ add_library(vscpl2drv-logger
   ./src/vscpl2drv-logger.cpp
   ./common/log.cpp
   ./common/log.cpp
-  ./third-party/Mustache/mustache.hpp
-  ./third-party/spdlog/include/spdlog/spdlog.h
-  ./third-party/vscp/src/vscp/common/vscp.h
-  ./third-party/vscp/src/vscp/common/vscphelper.h
-  ./third-party/vscp/src/vscp/common/vscphelper.cpp
-  ./third-party/vscp/src/vscp/common/guid.h
-  ./third-party/vscp/src/vscp/common/guid.cpp 
-  ./third-party/vscp/src/vscp/common/vscp.h
-  ./third-party/vscp/src/vscp/common/vscpdatetime.h
-  ./third-party/vscp/src/vscp/common/vscpdatetime.cpp
-  ./third-party/vscp/src/vscp/common/canal.h
-  ./third-party/vscp/src/common/vscpbase64.h
-  ./third-party/vscp/src/common/vscpbase64.c
-  ./third-party/vscp/src/common/vscp-aes.h
-  ./third-party/vscp/src/common/vscp-aes.c
-  ./third-party/vscp/src/common/crc.h
-  ./third-party/vscp/src/common/crc.c
-  ./third-party/vscp/src/common/crc8.h
-  ./third-party/vscp/src/common/crc8.c
-  ./third-party/vscp/src/common/vscpmd5.h
-  ./third-party/vscp/src/common/vscpmd5.c
-  ./third-party/crypto-algorithms/sha256.h
-  ./third-party/crypto-algorithms/sha256.c
+  ${THIRD_PARTY_MUSTACHE_DIR}/mustache.hpp
+  ${THIRD_PARTY_SPDLOG_DIR}/include/spdlog/spdlog.h
+  ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscp.h
+  ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscphelper.h
+  ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscphelper.cpp
+  ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/guid.h
+  ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/guid.cpp 
+  ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscp.h
+  ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscpdatetime.h
+  ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscpdatetime.cpp
+  ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/canal.h
+  ${THIRD_PARTY_VSCP_DIR}/src/common/vscpbase64.h
+  ${THIRD_PARTY_VSCP_DIR}/src/common/vscpbase64.c
+  ${THIRD_PARTY_VSCP_DIR}/src/common/vscp-aes.h
+  ${THIRD_PARTY_VSCP_DIR}/src/common/vscp-aes.c
+  ${THIRD_PARTY_VSCP_DIR}/src/common/crc.h
+  ${THIRD_PARTY_VSCP_DIR}/src/common/crc.c
+  ${THIRD_PARTY_VSCP_DIR}/src/common/crc8.h
+  ${THIRD_PARTY_VSCP_DIR}/src/common/crc8.c
+  ${THIRD_PARTY_VSCP_DIR}/src/common/vscpmd5.h
+  ${THIRD_PARTY_VSCP_DIR}/src/common/vscpmd5.c
+  ${THIRD_PARTY_CRYPTO_ALGORITHMS_DIR}/sha256.h
+  ${THIRD_PARTY_CRYPTO_ALGORITHMS_DIR}/sha256.c
 )
 
 if (WIN32)
@@ -330,12 +334,12 @@ if (WIN32)
   find_path(PTHREAD_INCLUDE_DIR pthread.h)
 
   include_directories( PUBLIC src/
-    ./third-party/vscp/src/vscp/common/  
-    ./third-party/vscp/src/common
-    ./third-party/json/include
-    ./third-party/spdlog/include
-    ./third-party/Mustache
-    ./third-party/maddy/include
+    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/  
+    ${THIRD_PARTY_VSCP_DIR}/src/common
+    ${THIRD_PARTY_JSON_DIR}/include
+    ${THIRD_PARTY_SPDLOG_DIR}/include
+    ${THIRD_PARTY_MUSTACHE_DIR}
+    ${THIRD_PARTY_MADDY_DIR}/include
     ${PThreads4W_INCLUDE_DIR}
     ${CMAKE_BINARY_DIR}
     ${OPENSSL_INCLUDE_DIR}
@@ -343,12 +347,12 @@ if (WIN32)
     ${LOCAL_SYSLOG_INCLUDE} )
 else()
   include_directories( PUBLIC src/
-    ./third-party/vscp/src/vscp/common/  
-    ./third-party/vscp/src/common
-    ./third-party/json/include
-    ./third-party/spdlog/include
-    ./third-party/Mustache
-    ./third-party/maddy/include
+    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/  
+    ${THIRD_PARTY_VSCP_DIR}/src/common
+    ${THIRD_PARTY_JSON_DIR}/include
+    ${THIRD_PARTY_SPDLOG_DIR}/include
+    ${THIRD_PARTY_MUSTACHE_DIR}
+    ${THIRD_PARTY_MADDY_DIR}/include
     ${CMAKE_BINARY_DIR}
     ${OPENSSL_INCLUDE_DIR}
     ${LOCAL_SYSLOG_INCLUDE} )

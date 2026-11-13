@@ -20,8 +20,6 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: grodansparadis/vscpl2drv-logger
-        submodules: 'recursive'
-
     - name: Update before installing packages
       run: sudo ls /root && sudo apt-get update
 

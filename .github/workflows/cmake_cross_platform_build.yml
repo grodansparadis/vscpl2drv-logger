@@ -29,8 +29,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
@@ -69,7 +67,6 @@ jobs:
             -G Ninja \
             -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
             -DCMAKE_INSTALL_PREFIX="/usr/local" \
-            -DVSCP_PATH="third-party/vscp" \
             -DOPENSSL_ROOT_DIR="${OPENSSL_ROOT_DIR:-}" \
             -DEXPAT_ROOT_DIR="${EXPAT_ROOT_DIR:-}"
 
@@ -82,8 +79,7 @@ jobs:
             -A x64 `
             -DCMAKE_BUILD_TYPE="$env:BUILD_TYPE" `
             "-DCMAKE_TOOLCHAIN_FILE=$env:CMAKE_TOOLCHAIN_FILE" `
-            -DVCPKG_TARGET_TRIPLET="x64-windows" `
-            -DVSCP_PATH="third-party/vscp"
+            -DVCPKG_TARGET_TRIPLET="x64-windows"
 
       - name: Build
         shell: bash

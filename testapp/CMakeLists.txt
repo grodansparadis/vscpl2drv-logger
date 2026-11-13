@@ -84,37 +84,37 @@ endif()
 
 add_executable(${PROJECT_NAME})
 target_sources(${PROJECT_NAME} PRIVATE main.cpp
-  ../third-party/Mustache/mustache.hpp
-  ../third-party/spdlog/include
-  ../third-party/vscp/src/vscp/common/guid.h
-  ../third-party/vscp/src/vscp/common/guid.cpp 
-  ../third-party/vscp/src/vscp/common/vscp.h
-  ../third-party/vscp/src/vscp/common/vscpdatetime.h
-  ../third-party/vscp/src/vscp/common/vscpdatetime.cpp
-  ../third-party/vscp/src/vscp/common/vscphelper.h
-  ../third-party/vscp/src/vscp/common/vscphelper.cpp
-  ../third-party/vscp/src/vscp/common/canal.h
-  ../third-party/vscp/src/common/vscpbase64.h
-  ../third-party/vscp/src/common/vscpbase64.c
-  ../third-party/vscp/src/common/vscp-aes.h
-  ../third-party/vscp/src/common/vscp-aes.c
-  ../third-party/vscp/src/common/crc.h
-  ../third-party/vscp/src/common/crc.c
-  ../third-party/vscp/src/common/crc8.h
-  ../third-party/vscp/src/common/crc8.c
-  ../third-party/vscp/src/common/vscpmd5.h
-  ../third-party/vscp/src/common/vscpmd5.c
-  ../third-party/crypto-algorithms/sha256.h
-  ../third-party/crypto-algorithms/sha256.c)
+  ${THIRD_PARTY_MUSTACHE_DIR}/mustache.hpp
+  ${THIRD_PARTY_SPDLOG_DIR}/include
+  ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/guid.h
+  ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/guid.cpp 
+  ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscp.h
+  ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscpdatetime.h
+  ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscpdatetime.cpp
+  ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscphelper.h
+  ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/vscphelper.cpp
+  ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/canal.h
+  ${THIRD_PARTY_VSCP_DIR}/src/common/vscpbase64.h
+  ${THIRD_PARTY_VSCP_DIR}/src/common/vscpbase64.c
+  ${THIRD_PARTY_VSCP_DIR}/src/common/vscp-aes.h
+  ${THIRD_PARTY_VSCP_DIR}/src/common/vscp-aes.c
+  ${THIRD_PARTY_VSCP_DIR}/src/common/crc.h
+  ${THIRD_PARTY_VSCP_DIR}/src/common/crc.c
+  ${THIRD_PARTY_VSCP_DIR}/src/common/crc8.h
+  ${THIRD_PARTY_VSCP_DIR}/src/common/crc8.c
+  ${THIRD_PARTY_VSCP_DIR}/src/common/vscpmd5.h
+  ${THIRD_PARTY_VSCP_DIR}/src/common/vscpmd5.c
+  ${THIRD_PARTY_CRYPTO_ALGORITHMS_DIR}/sha256.h
+  ${THIRD_PARTY_CRYPTO_ALGORITHMS_DIR}/sha256.c)
 
 # Include directories
 if (WIN32)  
   target_include_directories(${PROJECT_NAME} PRIVATE
     src/
-    ../third-party/vscp/src/vscp/common/  
-    ../third-party/vscp/src/common/
-    ../third-party/json/single_include/
-    ../third-party/spdlog/include/
+    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/  
+    ${THIRD_PARTY_VSCP_DIR}/src/common/
+    ${THIRD_PARTY_JSON_DIR}/single_include/
+    ${THIRD_PARTY_SPDLOG_DIR}/include/
     ${CMAKE_BINARY_DIR}
     ${THREAD_INCLUDE_DIR}
     ${LOCAL_WIN_INCLUDE}
@@ -127,10 +127,10 @@ if (WIN32)
 else()
   target_include_directories(${PROJECT_NAME} PRIVATE
     src/
-    ../third-party/vscp/src/vscp/common/
-    ../third-party/vscp/src/common
-    ../third-party/json/single_include/
-    ../third-party/spdlog/include/
+    ${THIRD_PARTY_VSCP_DIR}/src/vscp/common/
+    ${THIRD_PARTY_VSCP_DIR}/src/common
+    ${THIRD_PARTY_JSON_DIR}/single_include/
+    ${THIRD_PARTY_SPDLOG_DIR}/include/
     ${CMAKE_BINARY_DIR}
     ${THREAD_INCLUDE_DIR}
     ${OPENSSL_INCLUDE_DIR}
