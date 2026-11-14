@@ -1,7 +1,0 @@
-#!/bin/bash
-
-pandoc -s -t man vscpl2drv-logger.1.md -o vscpl2drv-logger.1
-if  [[ $1 == "install" ]]; then
-	sudo cp vscpl2drv-logger.1 /usr/share/man/man1/
-fi
-mandb
